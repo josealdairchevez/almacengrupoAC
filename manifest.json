@@ -1,0 +1,22 @@
+{
+"id": "./index.html",
+"name": "Gestión de Almacén & Reverso AC",
+"short_name": "Almacén AC",
+"description": "Buscador de inventario A–Z, conteo interactivo de reverso por OT, control de incidencias y reportes con modo offline y nube Firestore.",
+"start_url": "./index.html",
+"scope": "./",
+"display": "standalone",
+"orientation": "portrait-primary",
+"background_color": "#070b14",
+"theme_color": "#070b14",
+"lang": "es-PE",
+"categories": ["business", "productivity", "utilities"],
+"icons": [
+{
+"src": "./icon.svg",
+"sizes": "any",
+"type": "image/svg+xml",
+"purpose": "any maskable"
+}
+]
+}
