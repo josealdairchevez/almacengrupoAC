@@ -112,6 +112,24 @@
     .sobrante-pulse {
       animation: sobrantePulse 1.8s infinite;
     }
+
+    /* Fase 2: Barra de pausa visual (1.3s) y resaltado al ubicar desde Incidencias */
+    @keyframes graceShrink {
+      from { width: 100%; }
+      to { width: 0%; }
+    }
+    @keyframes cardHighlightRing {
+      0% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0.75); }
+      45% { box-shadow: 0 0 0 6px rgba(34, 211, 238, 0.35); }
+      100% { box-shadow: 0 0 0 0 rgba(34, 211, 238, 0); }
+    }
+    .grace-bar-fill {
+      animation: graceShrink 1300ms linear forwards;
+    }
+    .rev-card-highlight {
+      border-color: rgba(34, 211, 238, 0.95) !important;
+      animation: cardHighlightRing 1.1s ease-out 2;
+    }
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -562,9 +580,10 @@
 
             <!-- Línea -->
             <div class="space-y-1.5 pt-2 border-t border-slate-800/70">
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-wrap">
                 <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Línea en OT</span>
                 <span id="revLineActiveBadge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/20 text-cyan-200 border border-cyan-400/50"></span>
+                <span id="revLineDoneBadge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-emerald-500/15 text-emerald-300 border border-emerald-500/45"></span>
               </div>
               <div id="revLineBar" class="flex flex-wrap gap-1.5"></div>
             </div>
@@ -584,8 +603,35 @@
         <div id="revIncidentSubBar" class="hidden flex-wrap items-center gap-1.5 pt-1"></div>
       </div>
 
-      <!-- Lista interactiva de productos de la OT -->
+      <!-- Lista interactiva de productos pendientes de la OT -->
       <div id="reversoList" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+
+      <!-- Sección desplegable inferior: Productos completados / revisados (Fase 1) -->
+      <div id="reversoCompletedSection" class="hidden rounded-2xl border border-emerald-500/35 bg-panel/90 overflow-hidden shadow-lg shadow-black/25">
+        <button
+          type="button"
+          id="btnToggleCompletedSection"
+          aria-expanded="false"
+          class="w-full px-4 py-3.5 flex flex-wrap items-center justify-between gap-2.5 bg-gradient-to-r from-emerald-500/15 via-slate-900/40 to-transparent hover:from-emerald-500/20 transition cursor-pointer text-left"
+        >
+          <div class="flex flex-wrap items-center gap-2 min-w-0">
+            <span class="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-400/60 text-emerald-300 flex items-center justify-center shrink-0">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>
+            </span>
+            <span class="text-xs sm:text-sm font-extrabold text-emerald-200 tracking-tight">Productos completados</span>
+            <span id="revCompletedCountBadge" class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-100 border border-emerald-400/50">0</span>
+            <span id="revCompletedAutoBadge" class="hidden text-[10px] font-extrabold px-2 py-0.5 rounded-md bg-cyan-500/15 text-cyan-200 border border-cyan-400/45"></span>
+            <span id="revCompletedSummary" class="font-mono text-[11px] text-slate-300"></span>
+          </div>
+          <div class="flex items-center gap-1.5 text-xs font-bold text-emerald-300 shrink-0">
+            <span id="revCompletedToggleLabel">Mostrar</span>
+            <svg id="revCompletedChevron" class="w-4 h-4 transition-transform duration-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+          </div>
+        </button>
+        <div id="reversoCompletedBody" class="hidden p-3 sm:p-4 border-t border-slate-800/80 bg-abyss/40">
+          <div id="reversoCompletedList" class="grid grid-cols-1 lg:grid-cols-2 gap-3"></div>
+        </div>
+      </div>
     </section>
 
     <!-- ==================== VISTA 3: CENTRO DE INCIDENCIAS Y REPORTES (FASE 3) ==================== -->
@@ -1839,6 +1885,10 @@ Reglas obligatorias:
       revFiltersOpen: true, // Panel plegable de filtros avanzados en Reverso
       revStatusFilters: [], // Vacío = Todos; permite combinar estados y desglose de incidencias
       revOnlyPending: false,
+      revCompletedOpen: false, // Acordeón inferior de productos completados (plegado por defecto)
+      revCompletedManualOverride: null, // Respeta clic manual Mostrar/Ocultar hasta nuevo filtro o búsqueda
+      highlightedOtKey: '',    // Resaltado temporal al saltar desde Incidencias ("Ver en OT →")
+      highlightTimer: null,
       incFilters: [],       // Vacío = Todas; permite combinar Dañados, Faltantes y Sobrantes
       extraTab: 'catalog',
       extraSelectedCatalog: null,
@@ -2367,13 +2417,13 @@ Reglas obligatorias:
       const label = document.getElementById('feedbackLabel');
       if (!btn || !icon || !label) return;
       if (state.feedbackEnabled) {
-        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 cursor-pointer transition active:scale-95';
         icon.textContent = '🔊';
         label.textContent = 'Audio/Vibra';
+        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25 cursor-pointer transition active:scale-95';
       } else {
-        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-slate-900 text-slate-400 border-slate-700 hover:text-slate-200 cursor-pointer transition active:scale-95';
         icon.textContent = '🔇';
         label.textContent = 'Silencio';
+        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-slate-800/90 text-slate-400 border-slate-700 hover:text-slate-200 cursor-pointer transition active:scale-95';
       }
     }
 
@@ -2383,7 +2433,7 @@ Reglas obligatorias:
       if (!btn || !dot) return;
       btn.setAttribute('aria-pressed', String(state.revOnlyPending));
       if (state.revOnlyPending) {
-        btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20 transition cursor-pointer active:scale-95';
+        btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/15 transition cursor-pointer active:scale-95';
         dot.className = 'w-2 h-2 rounded-full bg-cyan-300 animate-pulse';
       } else {
         btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95';
@@ -2391,19 +2441,43 @@ Reglas obligatorias:
       }
     }
 
-    // Mantiene visible brevemente (1.2s) un producto recién completado en modo "Solo pendientes"
-    // para que puedas ver su check animado o seguir tocando '+' si hubiera sobrantes.
+    // Mantiene visible brevemente (1.3s) un producto recién completado antes de bajarlo
+    // a "Productos completados" (o ocultarlo en modo "Solo pendientes"), permitiendo seguir tocando '+'
+    function clearGraceVisibility(key) {
+      if (state.graceTimers[key]) {
+        clearTimeout(state.graceTimers[key]);
+        delete state.graceTimers[key];
+      }
+      delete state.graceVisibleKeys[key];
+    }
+
+    function clearAllGraceTimers() {
+      Object.keys(state.graceTimers).forEach(k => clearTimeout(state.graceTimers[k]));
+      state.graceTimers = {};
+      state.graceVisibleKeys = {};
+    }
+
     function grantGraceVisibility(key) {
-      if (!state.revOnlyPending) return;
-      state.graceVisibleKeys[key] = true;
-      clearTimeout(state.graceTimers[key]);
+      state.graceVisibleKeys[key] = Date.now();
+      if (state.graceTimers[key]) clearTimeout(state.graceTimers[key]);
       state.graceTimers[key] = setTimeout(() => {
+        // Si el usuario está escribiendo una nota o cantidad en esta tarjeta, extiende la pausa
+        const activeEl = document.activeElement;
+        const isEditingThisCard = Boolean(
+          activeEl &&
+          activeEl.dataset &&
+          (activeEl.dataset.key === key || activeEl.dataset.revNote === key)
+        );
+        if (isEditingThisCard) {
+          grantGraceVisibility(key);
+          return;
+        }
         delete state.graceVisibleKeys[key];
         delete state.graceTimers[key];
-        if (state.activeTab === 'reverso' && state.revOnlyPending) {
+        if (state.activeTab === 'reverso') {
           renderReversoView();
         }
-      }, 1250);
+      }, 1300);
     }
 
     function updateItemProgress(key, mutatorFn, options = {}) {
@@ -2446,8 +2520,12 @@ Reglas obligatorias:
         }
       }
 
-      if (nextStatus.isReviewed && state.revOnlyPending) {
+      // Pausa de gracia (1.3s) solo cuando pasa de pendiente a revisado o se sigue ajustando durante la pausa
+      const wasInGrace = Boolean(state.graceVisibleKeys[key]);
+      if (nextStatus.isReviewed && (!prevStatus.isReviewed || wasInGrace)) {
         grantGraceVisibility(key);
+      } else if (!nextStatus.isReviewed && wasInGrace) {
+        clearGraceVisibility(key);
       }
 
       persistActiveOtLocally();
@@ -2520,6 +2598,7 @@ Reglas obligatorias:
 
     // Alterna filtros de estado/desglose en Reverso permitiendo combinaciones múltiples
     function toggleRevStatusFilter(id) {
+      state.revCompletedManualOverride = null;
       if (id === 'ALL') {
         state.revStatusFilters = [];
         state.revOnlyPending = false;
@@ -2578,16 +2657,40 @@ Reglas obligatorias:
       }
       // Incluye también cualquier línea presente en los ítems de la OT que coincida con las zonas activas
       const presentCounts = {};
+      const pendingCounts = {};
       state.ot.items.forEach(it => {
         if (!state.revZones.length || state.revZones.includes(it.zone)) {
           presentCounts[it.linea] = (presentCounts[it.linea] || 0) + 1;
+          const prog = getProgressForKey(it.key);
+          const st = evaluateItemStatus(it, prog);
+          if (!st.isReviewed) {
+            pendingCounts[it.linea] = (pendingCounts[it.linea] || 0) + 1;
+          }
         }
       });
       const ordered = ALL_LINES_ORDER.filter(l => allowed.has(l) && presentCounts[l] > 0);
       Object.keys(presentCounts).forEach(l => {
         if (!ordered.includes(l)) ordered.push(l);
       });
-      return { lines: ordered, counts: presentCounts };
+      return { lines: ordered, counts: presentCounts, pendingCounts };
+    }
+
+    // Fase 3: Configura atajos de salto rápido únicamente para metas altas (meta >= 10)
+    function getQuickStepConfig(item) {
+      if (!item || item.meta < 10) return null;
+      const isPackDozen = /\b(lat\.?|bot\.?)\b/i.test(item.presentacion || '');
+      if (isPackDozen) {
+        return {
+          label: 'Pack 6/12',
+          steps: item.meta >= 36 ? [6, 12, 24] : [6, 12],
+          undoStep: 6
+        };
+      }
+      return {
+        label: 'Lote 5/10',
+        steps: item.meta >= 40 ? [5, 10, 20] : [5, 10],
+        undoStep: 5
+      };
     }
 
     function renderReversoView() {
@@ -2700,37 +2803,56 @@ Reglas obligatorias:
         if (state.revZones.length) revZoneBadge.textContent = `${state.revZones.length} selec.`;
       }
 
-      const zoneChips = [
+      const revZoneItems = [
         { id: 'ALL', label: `Todos (${counts.ALL})` },
-        { id: 'ALM1', label: `Almacén 1 · J–O (${counts.ALM1})` },
-        { id: 'ALM2', label: `Almacén 2 · A–G (${counts.ALM2})` },
+        { id: 'ALM1', label: `Alm. 1 · J–O (${counts.ALM1})` },
+        { id: 'ALM2', label: `Alm. 2 · A–G (${counts.ALM2})` },
         { id: 'P', label: `Línea P (${counts.P})` },
-        { id: 'Z', label: `Superior Z (${counts.Z})` }
+        { id: 'Z', label: `Sup. Z (${counts.Z})` }
       ];
 
-      document.getElementById('revZoneBar').innerHTML = zoneChips.map(z => {
-        const active = z.id === 'ALL' ? state.revZones.length === 0 : state.revZones.includes(z.id);
-        const prefix = (z.id !== 'ALL' && active) ? '✓ ' : '';
-        return `
-          <button
-            type="button"
-            data-rev-zone="${z.id}"
-            aria-pressed="${active}"
-            class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
-              active
-                ? 'bg-amber-500/20 text-amber-200 border-amber-400 shadow-sm shadow-amber-500/15'
-                : 'bg-panel text-slate-300 border-slate-800 hover:border-slate-700'
-            }"
-          >${prefix}${z.label}</button>
-        `;
-      }).join('');
+      const revZoneBar = document.getElementById('revZoneBar');
+      if (revZoneBar) {
+        revZoneBar.innerHTML = revZoneItems.map(z => {
+          const active = z.id === 'ALL' ? state.revZones.length === 0 : state.revZones.includes(z.id);
+          return `
+            <button
+              type="button"
+              data-rev-zone="${z.id}"
+              aria-pressed="${active}"
+              class="px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+                active
+                  ? 'bg-amber-500/20 text-amber-200 border-amber-400 shadow-sm shadow-amber-500/15'
+                  : 'bg-panel text-slate-300 border-slate-800 hover:border-slate-700'
+              }"
+            >${z.id !== 'ALL' && active ? '✓ ' : ''}${z.label}</button>
+          `;
+        }).join('');
+      }
 
-      // 2) Filtros por Línea dentro de la OT (dinámico por almacén + conteo de SKUs)
-      const { lines: availableRevLines, counts: revLineCounts } = getAvailableLinesForRevZones();
+      // 2) Filtros por Línea dentro de la OT (dinámico por almacén + pendientes y cierre verde por pasillo)
+      const {
+        lines: availableRevLines,
+        counts: revLineCounts,
+        pendingCounts: revLinePendingCounts
+      } = getAvailableLinesForRevZones();
+
       const revLineBadge = document.getElementById('revLineActiveBadge');
       if (revLineBadge) {
         revLineBadge.classList.toggle('hidden', !state.revLines.length);
         if (state.revLines.length) revLineBadge.textContent = `${state.revLines.length} selec.`;
+      }
+
+      const doneLinesCount = availableRevLines.filter(
+        l => (revLineCounts[l] || 0) > 0 && (revLinePendingCounts[l] || 0) === 0
+      ).length;
+      const revLineDoneBadge = document.getElementById('revLineDoneBadge');
+      if (revLineDoneBadge) {
+        const showDoneBadge = availableRevLines.length > 0 && doneLinesCount > 0;
+        revLineDoneBadge.classList.toggle('hidden', !showDoneBadge);
+        if (showDoneBadge) {
+          revLineDoneBadge.textContent = `✓ ${doneLinesCount}/${availableRevLines.length} cerradas`;
+        }
       }
 
       const revLineBar = document.getElementById('revLineBar');
@@ -2746,18 +2868,31 @@ Reglas obligatorias:
 
         availableRevLines.forEach(l => {
           const active = state.revLines.includes(l);
-          const cnt = revLineCounts[l] || 0;
+          const totalCnt = revLineCounts[l] || 0;
+          const pendCnt = revLinePendingCounts[l] || 0;
+          const isLineDone = totalCnt > 0 && pendCnt === 0;
+
+          let chipCls = 'bg-panel text-slate-200 border-slate-800 hover:border-slate-600';
+          if (isLineDone && active) {
+            chipCls = 'bg-emerald-500/25 text-emerald-100 border-emerald-400 ring-2 ring-cyan-400/70 shadow-sm shadow-emerald-500/20';
+          } else if (isLineDone) {
+            chipCls = 'bg-emerald-500/15 text-emerald-200 border-emerald-500/55 hover:border-emerald-400';
+          } else if (active) {
+            chipCls = 'bg-cyan-500/25 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20';
+          }
+
+          const innerHtml = isLineDone
+            ? `<span class="text-emerald-300 font-black">✓</span><span>${l}</span><span class="text-[10px] font-semibold text-emerald-200/80">${totalCnt}</span>`
+            : `<span>${l}</span><span class="text-[10px] font-semibold ${active ? 'text-cyan-200/90' : 'text-amber-300/85'}">· ${pendCnt} pend.</span>`;
+
           lineBtns.push(`
             <button
               type="button"
               data-rev-line="${l}"
               aria-pressed="${active}"
-              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold border transition cursor-pointer ${
-                active
-                  ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20'
-                  : 'bg-panel text-slate-200 border-slate-800 hover:border-slate-600'
-              }"
-            ><span>${l}</span><span class="text-[10px] font-semibold ${active ? 'text-cyan-200/90' : 'text-slate-500'}">${cnt}</span></button>
+              title="Línea ${l}: ${isLineDone ? `Completada (${totalCnt}/${totalCnt})` : `${pendCnt} pendientes de ${totalCnt} SKUs`}"
+              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold border transition cursor-pointer ${chipCls}"
+            >${innerHtml}</button>
           `);
         });
         revLineBar.innerHTML = lineBtns.join('');
@@ -2854,7 +2989,18 @@ Reglas obligatorias:
       }
 
       const listEl = document.getElementById('reversoList');
+      const completedSectionEl = document.getElementById('reversoCompletedSection');
+      const completedBodyEl = document.getElementById('reversoCompletedBody');
+      const completedListEl = document.getElementById('reversoCompletedList');
+      const completedCountEl = document.getElementById('revCompletedCountBadge');
+      const completedSummaryEl = document.getElementById('revCompletedSummary');
+      const completedToggleBtn = document.getElementById('btnToggleCompletedSection');
+      const completedToggleLabel = document.getElementById('revCompletedToggleLabel');
+      const completedChevron = document.getElementById('revCompletedChevron');
+
       if (!visible.length) {
+        if (completedSectionEl) completedSectionEl.classList.add('hidden');
+        if (completedListEl) completedListEl.innerHTML = '';
         const allDoneMsg = state.revOnlyPending && stats.pendingSkus === 0
           ? '🎉 ¡Excelente! No quedan productos pendientes en esta OT.'
           : 'No se encontraron productos en la OT con ese filtro.';
@@ -2875,7 +3021,8 @@ Reglas obligatorias:
         pendiente: 'border-slate-800/90 bg-panel/95'
       };
 
-      listEl.innerHTML = visible.map(it => {
+      // Generador reutilizable de tarjetas (para pendientes arriba y completados abajo)
+      const renderCardHtml = it => {
         const z = ZONES[it.zone] || ZONES.Z;
         const prog = getProgressForKey(it.key);
         const st = evaluateItemStatus(it, prog);
@@ -2885,62 +3032,47 @@ Reglas obligatorias:
         const hasAnyData = prog.buenos > 0 || prog.danados > 0 || prog.faltanteConfirmado || prog.motivo || prog.nota;
         const cardStyle = borderByCode[st.code] || borderByCode.pendiente;
         const safeKey = escapeHtml(it.key);
+        const isInGrace = Boolean(state.graceVisibleKeys[it.key]) && st.isReviewed;
+        const isHighlighted = state.highlightedOtKey === it.key;
 
-        // Franja de desglose de estado (Picking / Dañados / Faltante / Sobrante)
-        let summaryStrip = '';
-        if (st.code === 'danado') {
-          summaryStrip = `
-            <div class="rounded-xl bg-amber-500/10 border border-amber-500/35 px-3 py-1.5 text-[11px] font-semibold text-amber-200 flex flex-wrap items-center justify-between gap-2">
-              <span>Picking: <strong class="font-mono text-white">${prog.buenos}</strong> · Dañados: <strong class="font-mono text-amber-300">${prog.danados}</strong></span>
-              <span class="font-mono">Total ${total}/${it.meta}</span>
-            </div>
-          `;
-        } else if (st.code === 'faltante') {
-          summaryStrip = `
-            <div class="rounded-xl bg-rose-500/10 border border-rose-500/35 px-3 py-1.5 text-[11px] font-semibold text-rose-200 flex flex-wrap items-center justify-between gap-2">
-              <span>Faltante confirmado: <strong class="font-mono text-rose-300">−${st.faltante}</strong>${prog.danados > 0 ? ` · Dañados: <strong class="font-mono text-amber-300">${prog.danados}</strong>` : ''}</span>
-              <span class="font-mono">Contados ${total}/${it.meta}</span>
-            </div>
-          `;
-        } else if (st.code === 'sobrante') {
-          summaryStrip = `
-            <div class="rounded-xl bg-fuchsia-500/10 border border-fuchsia-500/40 px-3 py-1.5 text-[11px] font-semibold text-fuchsia-200 flex flex-wrap items-center justify-between gap-2">
-              <span>${st.label}: <strong class="font-mono text-fuchsia-300">+${st.sobrante}</strong>${prog.danados > 0 ? ` · Dañados: <strong class="font-mono text-amber-300">${prog.danados}</strong>` : ''}</span>
-              <span class="font-mono">Total ${total}/${it.meta}</span>
-            </div>
-          `;
-        } else if (prog.danados > 0) {
-          summaryStrip = `
-            <div class="rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 text-[11px] font-semibold text-amber-200 flex flex-wrap items-center justify-between gap-2">
-              <span>Picking: <strong class="font-mono text-white">${prog.buenos}</strong> · Dañados: <strong class="font-mono text-amber-300">${prog.danados}</strong></span>
-              <span class="font-mono">Faltan ${it.meta - total} para meta</span>
-            </div>
-          `;
+        // Resumen compacto de conteo y observaciones cuando existe avance o incidencia
+        const summaryParts = [];
+        if (total > 0 || prog.faltanteConfirmado) {
+          summaryParts.push(`<span class="text-slate-300">Contado: <strong class="text-white">${total}/${it.meta}</strong></span>`);
+          if (prog.danados > 0) summaryParts.push(`<span class="text-amber-300 font-bold">Dañados: ${prog.danados}</span>`);
+          if (st.code === 'faltante') summaryParts.push(`<span class="text-rose-300 font-bold">Faltante: −${st.faltante}</span>`);
+          if (st.code === 'sobrante') summaryParts.push(`<span class="text-fuchsia-300 font-bold">Sobrante: +${st.sobrante}</span>`);
         }
+        const obsDetail = [prog.motivo, prog.nota].filter(Boolean).join(' · ');
+        const summaryStrip = (summaryParts.length || obsDetail) ? `
+          <div class="flex flex-wrap items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl bg-abyss/80 border border-slate-800/90 text-[11px] font-mono">
+            <div class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5">${summaryParts.join('')}</div>
+            ${obsDetail ? `<span class="text-[10px] font-sans text-amber-200/90 truncate max-w-full">Obs: ${escapeHtml(obsDetail)}</span>` : ''}
+          </div>
+        ` : '';
 
-        // Panel desplegable de Dañados / Motivo / Nota
+        // Panel desplegable de control de dañados (motivos rápidos + nota corta)
         const damagePanelHtml = isDamageOpen ? `
-          <div class="rounded-xl border border-amber-500/40 bg-abyss/90 p-3 space-y-3">
+          <div class="rounded-xl border border-amber-500/45 bg-abyss/90 p-3 space-y-2.5">
             <div class="flex flex-wrap items-center justify-between gap-2">
-              <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-300">⚠ Registro de dañados</span>
+              <span class="text-[11px] font-extrabold uppercase tracking-wider text-amber-300">Control de dañados</span>
               ${prog.buenos > 0 ? `
                 <button
                   type="button"
                   data-rev-action="move-to-damaged"
                   data-key="${safeKey}"
-                  class="px-2.5 py-1 rounded-lg bg-amber-500/15 hover:bg-amber-500/25 text-amber-200 border border-amber-500/40 text-[11px] font-bold cursor-pointer transition active:scale-95"
+                  class="px-2.5 py-1 rounded-lg text-[11px] font-extrabold bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/55 cursor-pointer transition active:scale-95"
                 >Pasar 1 de buenos →</button>
               ` : ''}
             </div>
 
-            <!-- Contador de dañados: + izquierda, input centro, − derecha -->
             <div class="grid grid-cols-12 gap-2 items-center">
               <button
                 type="button"
                 data-rev-action="dmg-inc"
                 data-key="${safeKey}"
-                class="col-span-4 min-h-[42px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/60 font-mono text-lg font-extrabold cursor-pointer transition active:scale-95"
-                aria-label="Sumar dañado"
+                class="col-span-4 min-h-[40px] rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-400/60 font-mono text-xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95"
+                aria-label="Sumar un dañado"
               >+</button>
               <div class="col-span-4">
                 <input
@@ -2951,99 +3083,137 @@ Reglas obligatorias:
                   data-key="${safeKey}"
                   value="${prog.danados}"
                   aria-label="Cantidad dañada"
-                  class="w-full min-h-[42px] text-center font-mono text-base font-extrabold rounded-xl bg-panel border border-amber-500/50 text-amber-200 focus:outline-none focus:border-amber-300"
+                  class="w-full min-h-[40px] text-center font-mono text-base font-extrabold rounded-xl bg-panel border border-amber-500/45 text-amber-100 focus:outline-none focus:border-amber-400"
                 />
               </div>
               <button
                 type="button"
                 data-rev-action="dmg-dec"
                 data-key="${safeKey}"
-                class="col-span-4 min-h-[42px] rounded-xl bg-slate-800/90 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-lg font-extrabold cursor-pointer transition active:scale-95"
-                aria-label="Restar dañado"
+                class="col-span-4 min-h-[40px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95"
+                aria-label="Restar un dañado"
               >−</button>
             </div>
 
-            <!-- Motivos rápidos -->
-            <div class="space-y-1.5">
-              <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">Motivo rápido</span>
-              <div class="flex flex-wrap gap-1.5">
-                ${DAMAGE_REASONS.map(reason => {
-                  const activeReason = prog.motivo === reason;
-                  return `
-                    <button
-                      type="button"
-                      data-rev-action="set-reason"
-                      data-key="${safeKey}"
-                      data-reason="${escapeHtml(reason)}"
-                      class="px-2.5 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
-                        activeReason
-                          ? 'bg-amber-500/25 text-amber-100 border-amber-400'
-                          : 'bg-panel text-slate-400 border-slate-800 hover:text-slate-200'
-                      }"
-                    >${escapeHtml(reason)}</button>
-                  `;
-                }).join('')}
-              </div>
+            <div class="flex flex-wrap gap-1.5">
+              ${DAMAGE_REASONS.map(r => {
+                const active = prog.motivo === r;
+                return `
+                  <button
+                    type="button"
+                    data-rev-action="set-reason"
+                    data-key="${safeKey}"
+                    data-reason="${escapeHtml(r)}"
+                    class="px-2 py-1 rounded-lg text-[11px] font-bold border transition cursor-pointer ${
+                      active
+                        ? 'bg-amber-500/25 text-amber-100 border-amber-400'
+                        : 'bg-panel text-slate-400 border-slate-800 hover:text-slate-200'
+                    }"
+                  >${escapeHtml(r)}</button>
+                `;
+              }).join('')}
             </div>
 
-            <!-- Nota corta -->
-            <div class="space-y-1">
-              <input
-                type="text"
-                maxlength="120"
-                data-rev-note="${safeKey}"
-                value="${escapeHtml(prog.nota)}"
-                placeholder="Nota corta opcional (ej. bolsa rasgada en base)..."
-                class="w-full px-3 py-2 rounded-xl bg-panel border border-slate-700/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
-              />
+            <input
+              type="text"
+              maxlength="120"
+              data-rev-note="${safeKey}"
+              value="${escapeHtml(prog.nota)}"
+              placeholder="Nota corta del daño (ej. bolsa rota en esquina)..."
+              class="w-full px-3 py-2 rounded-xl bg-panel border border-slate-700/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-400"
+            />
+          </div>
+        ` : '';
+
+        // Barra visual de pausa de gracia (1.3s) antes de bajar a completados
+        const graceStripHtml = isInGrace ? `
+          <div class="pt-1.5 space-y-1">
+            <div class="flex items-center justify-between gap-2 text-[10px] font-bold">
+              <span class="text-emerald-300">${state.revOnlyPending ? '↓ Ocultando completado...' : '↓ Pasando a completados...'}</span>
+              <span class="text-slate-400">Sigue tocando + si hay sobrante</span>
+            </div>
+            <div class="w-full h-1 rounded-full bg-slate-800/90 overflow-hidden">
+              <div class="h-full rounded-full bg-gradient-to-r from-emerald-400 via-cyan-400 to-cyan-300 grace-bar-fill"></div>
+            </div>
+          </div>
+        ` : '';
+
+        // Fase 3: Mini-atajos de salto rápido en productos con meta alta (meta >= 10)
+        const quickStepCfg = getQuickStepConfig(it);
+        const quickStepRowHtml = quickStepCfg ? `
+          <div class="flex flex-wrap items-center justify-between gap-1.5 px-2.5 py-1.5 rounded-xl bg-abyss/75 border border-slate-800/90">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 shrink-0">${quickStepCfg.label}</span>
+            <div class="flex flex-wrap items-center gap-1.5">
+              ${quickStepCfg.steps.map(step => `
+                <button
+                  type="button"
+                  data-rev-action="add-step"
+                  data-step="${step}"
+                  data-key="${safeKey}"
+                  class="px-2.5 py-1 min-h-[32px] rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-200 border border-emerald-400/50 font-mono text-xs font-extrabold cursor-pointer transition active:scale-95"
+                  title="Sumar ${step} unidades de un toque"
+                >+${step}</button>
+              `).join('')}
+              ${prog.buenos >= quickStepCfg.undoStep ? `
+                <button
+                  type="button"
+                  data-rev-action="add-step"
+                  data-step="-${quickStepCfg.undoStep}"
+                  data-key="${safeKey}"
+                  class="px-2 py-1 min-h-[32px] rounded-lg bg-slate-800/90 hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 font-mono text-xs font-extrabold cursor-pointer transition active:scale-95"
+                  title="Restar ${quickStepCfg.undoStep} unidades"
+                >−${quickStepCfg.undoStep}</button>
+              ` : ''}
             </div>
           </div>
         ` : '';
 
         return `
-          <article class="rounded-2xl border p-4 flex flex-col justify-between gap-3 transition-colors ${cardStyle}">
-            <!-- Encabezado de tarjeta -->
-            <div class="space-y-1.5">
-              <div class="flex items-start justify-between gap-2 flex-wrap">
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <button
-                    type="button"
-                    data-rev-copy="${escapeHtml(it.posicion)}"
-                    class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 cursor-pointer active:scale-95 transition"
-                    title="Copiar posición"
-                  >${highlightMatches(it.posicion, state.revSearch)}</button>
-                  <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${z.badgeClass}">${z.short}</span>
-                  <button
-                    type="button"
-                    data-rev-copy="${escapeHtml(it.codigo)}"
-                    class="font-mono text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer"
-                    title="Copiar código"
-                  >${highlightMatches(it.codigo, state.revSearch)}</button>
-                </div>
-                <div class="flex items-center gap-1.5 flex-wrap justify-end">
-                  <span class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-abyss text-amber-300 border border-amber-500/40">
-                    Meta: ${it.meta}
-                  </span>
-                  ${renderStatusBadgeHtml(st, isFresh)}
-                </div>
+          <article
+            data-rev-card="${safeKey}"
+            class="rounded-2xl border p-3.5 sm:p-4 space-y-3 transition ${cardStyle} ${isHighlighted ? 'rev-card-highlight' : ''}"
+          >
+            <!-- Cabecera: Posición, Zona, Código + Meta ERP y Estado -->
+            <div class="flex flex-wrap items-center justify-between gap-2">
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  data-rev-copy="${escapeHtml(it.posicion)}"
+                  class="font-mono text-xs font-extrabold px-2.5 py-1 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 cursor-pointer active:scale-95 transition"
+                  title="Copiar posición"
+                >${highlightMatches(it.posicion, state.revSearch)}</button>
+                <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${z.badgeClass}">${z.short}</span>
+                <button
+                  type="button"
+                  data-rev-copy="${escapeHtml(it.codigo)}"
+                  class="font-mono text-[11px] font-bold px-2 py-0.5 rounded-md bg-abyss text-slate-300 border border-slate-700 cursor-pointer active:scale-95 transition"
+                  title="Copiar código"
+                >${highlightMatches(it.codigo, state.revSearch)}</button>
               </div>
-              <h3 class="text-sm font-bold text-white leading-snug">${highlightMatches(it.nombre, state.revSearch)}</h3>
-              <p class="font-mono text-[11px] text-slate-400">${highlightMatches(it.presentacion, state.revSearch)}</p>
+              <div class="flex items-center gap-1.5 flex-wrap">
+                <span class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-abyss border border-slate-700/90 text-amber-300">
+                  Meta: ${it.meta}
+                </span>
+                ${renderStatusBadgeHtml(st, isFresh)}
+              </div>
             </div>
 
-            ${summaryStrip}
+            <!-- Nombre y presentación -->
+            <div class="space-y-0.5">
+              <h3 class="text-sm font-bold text-white leading-snug">${highlightMatches(it.nombre, state.revSearch)}</h3>
+              <p class="font-mono text-[11px] text-amber-300/90">${highlightMatches(it.presentacion, state.revSearch)}</p>
+            </div>
 
-            <!-- Contador interactivo: + a la izquierda, input editable al centro, − a la derecha -->
+            <!-- Contador interactivo: + izquierda | cantidad editable | − derecha | ⚡ =Meta -->
             <div class="grid grid-cols-12 gap-2 items-center">
               <button
                 type="button"
                 data-rev-action="inc"
                 data-key="${safeKey}"
-                class="col-span-3 min-h-[46px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/60 font-mono text-2xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95 shadow-sm shadow-emerald-500/10"
+                class="col-span-3 min-h-[46px] rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-200 border border-emerald-400/60 font-mono text-2xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95"
                 aria-label="Sumar uno"
               >+</button>
-
-              <div class="col-span-4 relative">
+              <div class="col-span-4">
                 <input
                   type="number"
                   inputmode="numeric"
@@ -3052,21 +3222,17 @@ Reglas obligatorias:
                   data-key="${safeKey}"
                   value="${prog.buenos}"
                   aria-label="Cantidad buena contada"
-                  class="w-full min-h-[46px] text-center font-mono text-lg font-extrabold rounded-xl bg-abyss border border-slate-700 text-white focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20"
+                  class="w-full min-h-[46px] text-center font-mono text-lg font-extrabold rounded-xl bg-abyss border border-slate-700 text-white focus:outline-none focus:border-cyan-400"
                 />
-                <span class="pointer-events-none block text-center text-[9px] font-bold uppercase tracking-wider text-slate-500 mt-0.5">
-                  Buenos (Picking)
-                </span>
+                <span class="block text-center text-[9px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Buenos</span>
               </div>
-
               <button
                 type="button"
                 data-rev-action="dec"
                 data-key="${safeKey}"
-                class="col-span-3 min-h-[46px] rounded-xl bg-slate-800/90 hover:bg-rose-500/20 text-slate-200 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 font-mono text-2xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95"
+                class="col-span-3 min-h-[46px] rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-mono text-2xl font-extrabold flex items-center justify-center cursor-pointer transition active:scale-95"
                 aria-label="Restar uno"
               >−</button>
-
               <button
                 type="button"
                 data-rev-action="fill-meta"
@@ -3079,135 +3245,277 @@ Reglas obligatorias:
               </button>
             </div>
 
-            <!-- Barra inferior de acciones rápidas -->
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
-              <button
-                type="button"
-                data-rev-action="toggle-damage"
-                data-key="${safeKey}"
-                class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer active:scale-95 ${
-                  prog.danados > 0 || isDamageOpen
-                    ? 'bg-amber-500/20 text-amber-200 border-amber-400/60'
-                    : 'bg-abyss text-slate-300 border-slate-800 hover:border-amber-500/40 hover:text-amber-200'
-                }"
-              >
-                <span>⚠ Dañados${prog.danados > 0 ? ` (${prog.danados})` : ''}</span>
-              </button>
+            ${quickStepRowHtml}
+            ${summaryStrip}
 
+            <!-- Barra inferior de acciones rápidas -->
+            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/75">
               <div class="flex flex-wrap items-center gap-1.5">
-                ${total < it.meta && !prog.faltanteConfirmado ? `
+                <button
+                  type="button"
+                  data-rev-action="toggle-damage"
+                  data-key="${safeKey}"
+                  class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold border transition cursor-pointer active:scale-95 ${
+                    isDamageOpen || prog.danados > 0
+                      ? 'bg-amber-500/20 text-amber-200 border-amber-400/65'
+                      : 'bg-abyss text-slate-300 border-slate-700/90 hover:border-amber-400/50 hover:text-amber-200'
+                  }"
+                >⚠ Dañados${prog.danados > 0 ? ` (${prog.danados})` : ''}</button>
+
+                ${st.code === 'pendiente' && total < it.meta ? `
                   <button
                     type="button"
                     data-rev-action="confirm-missing"
                     data-key="${safeKey}"
-                    class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/50 transition cursor-pointer active:scale-95"
-                  >Confirmar faltante (−${it.meta - total})</button>
+                    class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold bg-rose-500/15 hover:bg-rose-500/25 text-rose-200 border border-rose-500/50 transition cursor-pointer active:scale-95"
+                  >Confirmar faltante (−${st.faltante})</button>
                 ` : ''}
 
-                ${prog.faltanteConfirmado ? `
+                ${st.code === 'faltante' ? `
                   <button
                     type="button"
                     data-rev-action="reopen"
                     data-key="${safeKey}"
-                    class="px-2.5 py-1.5 rounded-xl text-xs font-extrabold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/55 transition cursor-pointer active:scale-95"
+                    class="px-2.5 py-1.5 rounded-xl text-[11px] font-extrabold bg-cyan-500/15 hover:bg-cyan-500/25 text-cyan-200 border border-cyan-400/50 transition cursor-pointer active:scale-95"
                   >Reabrir</button>
                 ` : ''}
-
-                ${hasAnyData ? `
-                  <button
-                    type="button"
-                    data-rev-action="revert"
-                    data-key="${safeKey}"
-                    class="px-2.5 py-1.5 rounded-xl text-xs font-bold bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/80 transition cursor-pointer active:scale-95"
-                    title="Devolver este producto a cero"
-                  >↺ Revertir</button>
-                ` : ''}
               </div>
+
+              ${hasAnyData ? `
+                <button
+                  type="button"
+                  data-rev-action="revert"
+                  data-key="${safeKey}"
+                  class="px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-slate-900 hover:bg-slate-800 text-slate-400 hover:text-white border border-slate-700/80 transition cursor-pointer active:scale-95"
+                  title="Volver a cero este artículo"
+                >↺ Revertir</button>
+              ` : ''}
             </div>
 
             ${damagePanelHtml}
+            ${graceStripHtml}
           </article>
         `;
-      }).join('');
-
-      // Limpia la clave recién animada para que los siguientes renders no re-animen el mismo check
-      state.lastAnimatedKey = '';
-    }
-
-    // ==================== 8. CAMBIO DE PESTAÑAS ====================
-    function switchTab(tab) {
-      state.activeTab = tab;
-
-      const views = {
-        buscador: document.getElementById('viewBuscador'),
-        reverso: document.getElementById('viewReverso'),
-        incidencias: document.getElementById('viewIncidencias')
       };
 
-      const btns = {
-        buscador: document.getElementById('tabBtnBuscador'),
-        reverso: document.getElementById('tabBtnReverso'),
-        incidencias: document.getElementById('tabBtnIncidencias')
-      };
-
-      const activeStyles = {
-        buscador: 'bg-cyan-500/15 text-cyan-200 border-cyan-400/70 shadow-sm shadow-cyan-500/15',
-        reverso: 'bg-amber-500/15 text-amber-200 border-amber-400/70 shadow-sm shadow-amber-500/15',
-        incidencias: 'bg-rose-500/15 text-rose-200 border-rose-400/70 shadow-sm shadow-rose-500/15'
-      };
-      const inactiveStyle = 'bg-panel/80 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700';
-
-      Object.keys(views).forEach(k => {
-        const isCurrent = k === tab;
-        views[k].classList.toggle('hidden', !isCurrent);
-        btns[k].setAttribute('aria-selected', String(isCurrent));
-        btns[k].className = `flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
-          isCurrent ? activeStyles[k] : inactiveStyle
-        }`;
+      // Separación inteligente: pendientes (o en pausa de gracia 1.3s) arriba, completados abajo
+      const pendingItems = [];
+      const completedItems = [];
+      visible.forEach(it => {
+        const prog = getProgressForKey(it.key);
+        const st = evaluateItemStatus(it, prog);
+        const isInGrace = Boolean(state.graceVisibleKeys[it.key]);
+        if (st.isReviewed && !isInGrace) {
+          completedItems.push(it);
+        } else {
+          pendingItems.push(it);
+        }
       });
 
-      if (tab === 'reverso') renderReversoView();
-      if (tab === 'incidencias') renderIncidenciasView();
+      if (pendingItems.length > 0) {
+        listEl.innerHTML = pendingItems.map(renderCardHtml).join('');
+      } else {
+        listEl.innerHTML = `
+          <div class="lg:col-span-2 rounded-2xl border border-emerald-500/35 bg-emerald-500/5 p-6 text-center space-y-1.5">
+            <p class="text-sm font-extrabold text-emerald-200">✓ Sin pendientes en esta vista</p>
+            <p class="text-xs text-slate-400">Los <strong class="font-mono text-white">${completedItems.length}</strong> productos completados están ordenados en la sección inferior.</p>
+          </div>
+        `;
+      }
+
+      // Render del acordeón inferior de Productos completados (Fase 1 + Auto-despliegue Fase 2)
+      if (!completedItems.length) {
+        if (completedSectionEl) completedSectionEl.classList.add('hidden');
+        if (completedListEl) completedListEl.innerHTML = '';
+      } else if (completedSectionEl) {
+        let okCnt = 0;
+        let dmgCnt = 0;
+        let missCnt = 0;
+        let surpCnt = 0;
+        completedItems.forEach(it => {
+          const prog = getProgressForKey(it.key);
+          const st = evaluateItemStatus(it, prog);
+          if (st.code === 'completo') okCnt++;
+          if (prog.danados > 0) dmgCnt++;
+          if (st.code === 'faltante') missCnt++;
+          if (st.code === 'sobrante') surpCnt++;
+        });
+
+        const summaryTokens = [];
+        if (okCnt) summaryTokens.push(`✓ ${okCnt} OK`);
+        if (dmgCnt) summaryTokens.push(`⚠ ${dmgCnt} Dañ.`);
+        if (missCnt) summaryTokens.push(`− ${missCnt} Falt.`);
+        if (surpCnt) summaryTokens.push(`+ ${surpCnt} Sobr.`);
+
+        if (completedCountEl) completedCountEl.textContent = String(completedItems.length);
+        if (completedSummaryEl) completedSummaryEl.textContent = summaryTokens.join(' · ');
+
+        const hasHighlightedCompleted = Boolean(
+          state.highlightedOtKey && completedItems.some(it => it.key === state.highlightedOtKey)
+        );
+        const hasSearchCompleted = Boolean(state.revSearch.trim() && completedItems.length > 0);
+        const hasCompletedStatusFilter = state.revStatusFilters.some(f =>
+          ['completo', 'incidencias', 'danado', 'faltante', 'sobrante'].includes(f)
+        );
+
+        let autoReason = '';
+        if (hasHighlightedCompleted) autoReason = 'Ubicado desde Incidencias';
+        else if (hasSearchCompleted) autoReason = 'Abierto por búsqueda';
+        else if (hasCompletedStatusFilter) autoReason = 'Abierto por filtro';
+
+        const shouldAutoOpen = Boolean(autoReason);
+        const isOpen = state.revCompletedManualOverride !== null
+          ? state.revCompletedManualOverride
+          : (state.revCompletedOpen || shouldAutoOpen);
+
+        const autoBadgeEl = document.getElementById('revCompletedAutoBadge');
+        if (autoBadgeEl) {
+          const showAutoTag = shouldAutoOpen && isOpen && state.revCompletedManualOverride === null;
+          autoBadgeEl.classList.toggle('hidden', !showAutoTag);
+          if (showAutoTag) autoBadgeEl.textContent = autoReason;
+        }
+
+        completedSectionEl.classList.remove('hidden');
+        if (completedBodyEl) completedBodyEl.classList.toggle('hidden', !isOpen);
+        if (completedToggleBtn) completedToggleBtn.setAttribute('aria-expanded', String(isOpen));
+        if (completedToggleLabel) completedToggleLabel.textContent = isOpen ? 'Ocultar' : 'Mostrar';
+        if (completedChevron) completedChevron.classList.toggle('rotate-180', isOpen);
+        if (completedListEl) {
+          completedListEl.innerHTML = isOpen ? completedItems.map(renderCardHtml).join('') : '';
+        }
+      }
     }
 
-    // ==================== 9. FIRESTORE CLOUD SYNC + HISTORIAL DE OTs ====================
-    function setCloudStatus(mode, customLabel) {
-      state.cloud.status = mode;
-      const badge = document.getElementById('cloudStatusBadge');
-      const dot = document.getElementById('cloudStatusDot');
-      const text = document.getElementById('cloudStatusText');
-      if (!badge || !dot || !text) return;
+    // ==================== 8. NAVEGACIÓN DE PESTAÑAS ====================
+    function switchTab(tab) {
+      state.activeTab = tab;
+      const isBuscador = tab === 'buscador';
+      const isReverso = tab === 'reverso';
+      const isIncidencias = tab === 'incidencias';
 
-      const styles = {
-        online:  { badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/45', dot: 'bg-emerald-400', label: customLabel || 'NUBE ACTIVA' },
-        saving:  { badge: 'bg-amber-500/15 text-amber-300 border-amber-500/45', dot: 'bg-amber-400 animate-pulse', label: customLabel || 'GUARDANDO...' },
-        offline: { badge: 'bg-slate-800/95 text-amber-200 border-amber-500/40', dot: 'bg-amber-400', label: customLabel || 'OFFLINE · EN COLA' },
-        local:   { badge: 'bg-slate-800/95 text-slate-300 border-slate-700', dot: 'bg-slate-400', label: customLabel || 'MODO LOCAL' },
-        error:   { badge: 'bg-rose-500/15 text-rose-300 border-rose-500/45', dot: 'bg-rose-400', label: customLabel || 'REVISAR REGLAS' }
+      document.getElementById('viewBuscador').classList.toggle('hidden', !isBuscador);
+      document.getElementById('viewReverso').classList.toggle('hidden', !isReverso);
+      document.getElementById('viewIncidencias').classList.toggle('hidden', !isIncidencias);
+
+      const styleTab = (id, active, activeCls) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.setAttribute('aria-selected', String(active));
+        el.className = `flex items-center justify-center gap-1.5 px-2 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-bold border transition cursor-pointer ${
+          active
+            ? activeCls
+            : 'bg-panel/70 text-slate-400 border-slate-800 hover:text-slate-200 hover:border-slate-700'
+        }`;
       };
 
-      const cfg = styles[mode] || styles.local;
-      badge.className = `inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border ${cfg.badge}`;
-      dot.className = `w-1.5 h-1.5 rounded-full ${cfg.dot}`;
-      text.textContent = cfg.label;
+      styleTab('tabBtnBuscador', isBuscador, 'bg-cyan-500/15 text-cyan-200 border-cyan-400/70 shadow-sm shadow-cyan-500/15');
+      styleTab('tabBtnReverso', isReverso, 'bg-amber-500/15 text-amber-200 border-amber-400/70 shadow-sm shadow-amber-500/15');
+      styleTab('tabBtnIncidencias', isIncidencias, 'bg-rose-500/15 text-rose-200 border-rose-400/70 shadow-sm shadow-rose-500/15');
+
+      if (isBuscador) renderCatalogResults();
+      else if (isReverso) renderReversoView();
+      else if (isIncidencias) renderIncidenciasView();
     }
 
-    function buildCompactOtPayload() {
+    // ==================== 9. MODAL IMPORTADOR DE OT JSON ====================
+    function openJsonModal() {
+      const errEl = document.getElementById('jsonImportError');
+      const area = document.getElementById('jsonInputArea');
+      if (errEl) errEl.classList.add('hidden');
+      if (area) area.value = '';
+      document.getElementById('jsonModal').classList.remove('hidden');
+      setTimeout(() => { if (area) area.focus(); }, 60);
+    }
+
+    function closeJsonModal() {
+      document.getElementById('jsonModal').classList.add('hidden');
+    }
+
+    function handleImportOtJson() {
+      const errEl = document.getElementById('jsonImportError');
+      const rawText = (document.getElementById('jsonInputArea').value || '').trim();
+      errEl.classList.add('hidden');
+
+      if (!rawText) {
+        errEl.textContent = 'Pega el código JSON de la OT antes de importar.';
+        errEl.classList.remove('hidden');
+        return;
+      }
+
+      try {
+        const cleaned = rawText
+          .replace(/^```(?:json)?\s*/i, '')
+          .replace(/\s*```$/i, '')
+          .trim();
+        const parsed = JSON.parse(cleaned);
+        const rawItems = Array.isArray(parsed) ? parsed : parsed.items;
+        if (!Array.isArray(rawItems) || !rawItems.length) {
+          throw new Error('El JSON debe contener una lista "items" con al menos 1 producto.');
+        }
+
+        const otNumber = String((!Array.isArray(parsed) && parsed.ot) ? parsed.ot : new Date().toLocaleDateString('es-PE')).trim();
+        const otDate = String((!Array.isArray(parsed) && parsed.fecha) ? parsed.fecha : new Date().toLocaleDateString('es-PE')).trim();
+        const enrichedItems = rawItems.map((it, idx) => enrichOtItem(it, idx)).filter(it => it.codigo || it.nombre);
+        if (!enrichedItems.length) {
+          throw new Error('No se encontraron productos válidos dentro de "items".');
+        }
+
+        if (state.cloud.pendingSync) flushCloudOtSync();
+
+        const newDocId = sanitizeOtDocId(otNumber);
+        state.activeOtDocId = newDocId;
+        state.ot = { ot: otNumber, fecha: otDate, items: enrichedItems };
+        state.reversoProgress = {};
+        state.extraSobrantes = [];
+        state.reversoDamageOpen = {};
+        clearAllGraceTimers();
+        state.revSearch = '';
+        state.revQty = '';
+        state.revZones = [];
+        state.revLines = [];
+        state.revQuickQtys = [];
+        state.revStatusFilters = [];
+        state.revOnlyPending = false;
+        state.revCompletedOpen = false;
+        state.revCompletedManualOverride = null;
+
+        const revSearchEl = document.getElementById('revSearchInput');
+        const revQtyEl = document.getElementById('revQtyInput');
+        if (revSearchEl) revSearchEl.value = '';
+        if (revQtyEl) revQtyEl.value = '';
+
+        persistActiveOtLocally();
+        scheduleCloudSyncOt(true);
+        syncMetaToCloud();
+        updateOtHeaderBadges();
+        updateIncidentMetrics();
+        closeJsonModal();
+        switchTab('reverso');
+        showToast(`OT ${otNumber} importada (${enrichedItems.length} SKUs)`);
+      } catch (err) {
+        errEl.textContent = `Error al leer JSON: ${err.message || 'Formato inválido'}`;
+        errEl.classList.remove('hidden');
+      }
+    }
+
+    // ==================== 10. PERSISTENCIA LOCAL, NUBE FIRESTORE E HISTORIAL ====================
+    function buildOtDocPayload() {
+      const plainItems = state.ot.items.map(it => ({
+        codigo: it.codigo,
+        nombre: it.nombre,
+        presentacion: it.presentacion,
+        meta: it.meta,
+        posicion: it.posicion,
+        linea: it.linea,
+        zone: it.zone
+      }));
       return {
         docId: state.activeOtDocId,
-        ot: String(state.ot.ot || 'Personalizada'),
-        fecha: String(state.ot.fecha || ''),
-        items: state.ot.items.map(it => ({
-          codigo: it.codigo,
-          nombre: it.nombre,
-          presentacion: it.presentacion,
-          meta: it.meta,
-          posicion: it.posicion,
-          linea: it.linea,
-          zone: it.zone
-        })),
-        progress: state.reversoProgress || {},
-        extraSobrantes: Array.isArray(state.extraSobrantes) ? state.extraSobrantes : [],
+        ot: state.ot.ot,
+        fecha: state.ot.fecha,
+        items: plainItems,
+        progress: state.reversoProgress,
+        extraSobrantes: state.extraSobrantes,
         updatedAt: Date.now(),
         updatedBy: state.cloud.clientId
       };
@@ -3216,97 +3524,55 @@ Reglas obligatorias:
     function saveLocalHistoryCache() {
       try {
         localStorage.setItem(STORAGE_KEYS.otHistory, JSON.stringify(state.otHistory));
-        localStorage.setItem(STORAGE_KEYS.activeOtId, state.activeOtDocId);
       } catch (e) {}
       updateOtHeaderBadges();
     }
 
     function upsertLocalHistoryFromActive() {
-      if (!state.activeOtDocId) state.activeOtDocId = sanitizeOtDocId(state.ot.ot);
-      const prev = state.otHistory[state.activeOtDocId];
-      const payload = buildCompactOtPayload();
-      payload.createdAt = (prev && prev.createdAt) ? prev.createdAt : payload.updatedAt;
-      state.otHistory[state.activeOtDocId] = payload;
+      if (!state.activeOtDocId) {
+        state.activeOtDocId = sanitizeOtDocId(state.ot.ot);
+      }
+      state.otHistory[state.activeOtDocId] = buildOtDocPayload();
       saveLocalHistoryCache();
-      return payload;
     }
 
     function persistActiveOtLocally() {
+      const payload = buildOtDocPayload();
       try {
-        localStorage.setItem(STORAGE_KEYS.activeOt, JSON.stringify(state.ot));
+        localStorage.setItem(STORAGE_KEYS.activeOt, JSON.stringify({
+          ot: payload.ot,
+          fecha: payload.fecha,
+          items: payload.items
+        }));
+        localStorage.setItem(STORAGE_KEYS.activeOtId, state.activeOtDocId);
         localStorage.setItem(STORAGE_KEYS.reversoProgress, JSON.stringify(state.reversoProgress));
         localStorage.setItem(STORAGE_KEYS.extraSobrantes, JSON.stringify(state.extraSobrantes));
       } catch (e) {}
-      upsertLocalHistoryFromActive();
+      state.otHistory[state.activeOtDocId] = payload;
+      saveLocalHistoryCache();
     }
 
-    function flushCloudOtSync() {
-      clearTimeout(state.cloud.syncTimer);
-      state.cloud.syncTimer = null;
-      const payload = upsertLocalHistoryFromActive();
-      if (!state.cloud.db || !state.cloud.ready) return;
-
-      state.cloud.pendingSync = false;
-      state.cloud.lastLocalWriteTs = Date.now();
-      setCloudStatus(navigator.onLine ? 'saving' : 'offline');
-
-      state.cloud.db
-        .collection('almacen_ots')
-        .doc(state.activeOtDocId)
-        .set(payload, { merge: true })
-        .then(() => setCloudStatus(navigator.onLine ? 'online' : 'offline'))
-        .catch(err => {
-          console.error('[Firestore OT sync]', err);
-          if (err && err.code === 'permission-denied') {
-            setCloudStatus('error', 'SIN PERMISOS');
-            showToast('Firestore: revisa las Reglas de seguridad');
-          } else {
-            setCloudStatus(navigator.onLine ? 'local' : 'offline');
-          }
-        });
-    }
-
-    function scheduleCloudSyncOt(immediate = false) {
-      upsertLocalHistoryFromActive();
-      if (!state.cloud.db || !state.cloud.ready) return;
-      state.cloud.pendingSync = true;
-      if (immediate) {
-        flushCloudOtSync();
-        return;
-      }
-      setCloudStatus(navigator.onLine ? 'saving' : 'offline');
-      clearTimeout(state.cloud.syncTimer);
-      state.cloud.syncTimer = setTimeout(flushCloudOtSync, 450);
-    }
-
-    function syncMetaToCloud() {
-      if (!state.cloud.db || !state.cloud.ready) return;
-      state.cloud.lastLocalWriteTs = Date.now();
-      state.cloud.db
-        .collection('almacen_meta')
-        .doc('state')
-        .set({
-          activeOtDocId: state.activeOtDocId,
-          customCatalog: loadCustomProducts(),
-          updatedAt: Date.now(),
-          updatedBy: state.cloud.clientId
-        }, { merge: true })
-        .catch(err => console.error('[Firestore meta sync]', err));
-    }
-
-    function applyOtDocToActiveState(docData, docId) {
-      if (!docData || !Array.isArray(docData.items) || !docData.items.length) return;
-      state.activeOtDocId = docId;
+    function applyOtDocToActiveState(docData, docId, options = {}) {
+      if (!docData || !Array.isArray(docData.items)) return;
+      state.activeOtDocId = docId || docData.docId || sanitizeOtDocId(docData.ot);
       state.ot = {
         ot: String(docData.ot || 'Personalizada'),
         fecha: String(docData.fecha || ''),
         items: docData.items.map((it, idx) => enrichOtItem(it, idx))
       };
-      state.reversoProgress = (docData.progress && typeof docData.progress === 'object') ? docData.progress : {};
-      state.extraSobrantes = Array.isArray(docData.extraSobrantes) ? docData.extraSobrantes : [];
+      state.reversoProgress = (docData.progress && typeof docData.progress === 'object')
+        ? { ...docData.progress }
+        : {};
+      state.extraSobrantes = Array.isArray(docData.extraSobrantes)
+        ? docData.extraSobrantes.map(e => ({ ...e }))
+        : [];
 
       try {
-        localStorage.setItem(STORAGE_KEYS.activeOt, JSON.stringify(state.ot));
+        localStorage.setItem(STORAGE_KEYS.activeOt, JSON.stringify({
+          ot: state.ot.ot,
+          fecha: state.ot.fecha,
+          items: docData.items
+        }));
         localStorage.setItem(STORAGE_KEYS.activeOtId, state.activeOtDocId);
         localStorage.setItem(STORAGE_KEYS.reversoProgress, JSON.stringify(state.reversoProgress));
         localStorage.setItem(STORAGE_KEYS.extraSobrantes, JSON.stringify(state.extraSobrantes));
@@ -3314,184 +3580,183 @@ Reglas obligatorias:
 
       updateOtHeaderBadges();
       updateIncidentMetrics();
-      if (state.activeTab === 'reverso') renderReversoView();
-      if (state.activeTab === 'incidencias') renderIncidenciasView();
+      if (!options.skipRender) {
+        if (state.activeTab === 'reverso') renderReversoView();
+        if (state.activeTab === 'incidencias') renderIncidenciasView();
+      }
     }
 
-    async function initFirebaseCloud() {
+    function setCloudStatus(mode) {
+      state.cloud.status = mode;
+      const badge = document.getElementById('cloudStatusBadge');
+      const dot = document.getElementById('cloudStatusDot');
+      const txt = document.getElementById('cloudStatusText');
+      const hint = document.getElementById('historyCloudHint');
+      if (!badge || !dot || !txt) return;
+
+      if (mode === 'online') {
+        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border bg-emerald-500/15 text-emerald-300 border-emerald-500/45';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-emerald-400';
+        txt.textContent = 'NUBE ACTIVA';
+        if (hint) hint.textContent = 'Sincronizado en tiempo real con Firestore (almacen-grupo-ac)';
+      } else if (mode === 'syncing') {
+        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border bg-cyan-500/15 text-cyan-200 border-cyan-500/45';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-cyan-300 animate-pulse';
+        txt.textContent = 'GUARDANDO...';
+      } else if (mode === 'offline') {
+        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border bg-amber-500/15 text-amber-200 border-amber-500/45';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400';
+        txt.textContent = 'MODO OFFLINE';
+        if (hint) hint.textContent = 'Sin señal · Los cambios se sincronizarán apenas vuelva internet';
+      } else if (mode === 'error') {
+        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border bg-slate-800 text-slate-300 border-slate-700';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-rose-400';
+        txt.textContent = 'LOCAL ACTIVO';
+        if (hint) hint.textContent = 'Guardado local activo en este navegador';
+      } else {
+        badge.className = 'inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-extrabold tracking-wide border bg-slate-800/90 text-slate-300 border-slate-700';
+        dot.className = 'w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse';
+        txt.textContent = 'CONECTANDO...';
+      }
+    }
+
+    function syncMetaToCloud() {
+      if (!state.cloud.db || !state.cloud.ready) return;
+      state.cloud.lastLocalWriteTs = Date.now();
+      state.cloud.db.collection('almacen_meta').doc('config').set({
+        activeOtDocId: state.activeOtDocId,
+        customProducts: loadCustomProducts(),
+        updatedAt: Date.now(),
+        updatedBy: state.cloud.clientId
+      }, { merge: true }).catch(err => {
+        console.warn('[Firestore meta]', err);
+      });
+    }
+
+    function flushCloudOtSync() {
+      clearTimeout(state.cloud.syncTimer);
+      state.cloud.syncTimer = null;
+      state.cloud.pendingSync = false;
+      if (!state.cloud.db || !state.cloud.ready) return;
+
+      const payload = buildOtDocPayload();
+      state.cloud.lastLocalWriteTs = Date.now();
+      if (navigator.onLine) setCloudStatus('syncing');
+
+      state.cloud.db.collection('almacen_ots').doc(state.activeOtDocId).set(payload, { merge: true })
+        .then(() => {
+          setCloudStatus(navigator.onLine ? 'online' : 'offline');
+        })
+        .catch(err => {
+          console.warn('[Firestore sync OT]', err);
+          setCloudStatus(navigator.onLine ? 'error' : 'offline');
+        });
+    }
+
+    function scheduleCloudSyncOt(immediate = false) {
+      state.cloud.pendingSync = true;
+      clearTimeout(state.cloud.syncTimer);
+      if (immediate) {
+        flushCloudOtSync();
+      } else {
+        state.cloud.syncTimer = setTimeout(flushCloudOtSync, 450);
+      }
+    }
+
+    function initFirebaseCloud() {
       if (typeof firebase === 'undefined') {
-        setCloudStatus('local', 'MODO LOCAL');
+        setCloudStatus('error');
         return;
       }
-
       try {
         const app = firebase.apps.length ? firebase.app() : firebase.initializeApp(FIREBASE_CONFIG);
         const db = firebase.firestore(app);
-        const auth = firebase.auth(app);
 
-        try {
-          await db.enablePersistence({ synchronizeTabs: true });
-        } catch (persistErr) {
-          console.info('[Firestore] Persistencia:', persistErr.code || persistErr.message);
-        }
+        db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
 
-        // Autenticación anónima silenciosa antes de cualquier consulta
-        if (!auth.currentUser) {
-          await auth.signInAnonymously();
-        }
-        if (!auth.currentUser) {
-          setCloudStatus('local', 'MODO LOCAL');
-          return;
-        }
-
-        state.cloud.db = db;
-        state.cloud.ready = true;
-        setCloudStatus(navigator.onLine ? 'online' : 'offline');
-
-        // 1) Listener en tiempo real para OTs
-        db.collection('almacen_ots').onSnapshot(snapshot => {
-          if (snapshot.empty) {
-            if (!state.cloud.seeded) {
-              state.cloud.seeded = true;
-              flushCloudOtSync();
-              syncMetaToCloud();
-            }
-            return;
-          }
-
-          state.cloud.seeded = true;
-          const nextHistory = {};
-          snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data && Array.isArray(data.items)) {
-              nextHistory[doc.id] = { ...data, docId: doc.id };
-            }
-          });
-
-          state.otHistory = nextHistory;
-          saveLocalHistoryCache();
-
-          const activeDoc = nextHistory[state.activeOtDocId];
-          if (activeDoc) {
-            const isOwnEcho = activeDoc.updatedBy === state.cloud.clientId && (Date.now() - state.cloud.lastLocalWriteTs) < 4000;
-            if (!isOwnEcho && !state.cloud.pendingSync) {
-              applyOtDocToActiveState(activeDoc, state.activeOtDocId);
-            }
-          }
-
-          if (!document.getElementById('historyModal').classList.contains('hidden')) {
-            renderHistoryModal();
-          }
+        const startListeners = () => {
+          state.cloud.db = db;
+          state.cloud.ready = true;
           setCloudStatus(navigator.onLine ? 'online' : 'offline');
-        }, err => {
-          console.error('[Firestore OTs listener]', err);
-          if (err && err.code === 'permission-denied') {
-            setCloudStatus('error', 'SIN PERMISOS');
-          } else {
-            setCloudStatus(navigator.onLine ? 'local' : 'offline');
-          }
-        });
 
-        // 2) Listener de metadatos globales (OT activa y productos nuevos)
-        db.collection('almacen_meta').doc('state').onSnapshot(doc => {
-          if (!doc.exists) return;
-          const data = doc.data() || {};
-          const isOwnEcho = data.updatedBy === state.cloud.clientId && (Date.now() - state.cloud.lastLocalWriteTs) < 4000;
+          // 1) Escuchar metadatos globales (productos nuevos del Buscador)
+          db.collection('almacen_meta').doc('config').onSnapshot(snap => {
+            if (!snap.exists) return;
+            const data = snap.data() || {};
+            if (data.updatedBy === state.cloud.clientId) return;
+            if (Array.isArray(data.customProducts) && data.customProducts.length) {
+              try {
+                const localCustom = loadCustomProducts();
+                const merged = new Map();
+                [...localCustom, ...data.customProducts].forEach(r => {
+                  if (Array.isArray(r) && r.length >= 3) merged.set(`${r[0]}__${r[2]}`, r);
+                });
+                localStorage.setItem(STORAGE_KEYS.customCatalog, JSON.stringify(Array.from(merged.values())));
+                buildCatalog();
+                renderZoneButtons();
+                renderLineButtons();
+                if (state.activeTab === 'buscador') renderCatalogResults();
+              } catch (e) {}
+            }
+          }, err => console.warn('[Firestore meta listener]', err));
 
-          if (Array.isArray(data.customCatalog)) {
-            const localCustom = loadCustomProducts();
-            const merged = new Map();
-            [...localCustom, ...data.customCatalog].forEach(row => {
-              if (Array.isArray(row) && row.length >= 3) merged.set(`${row[0]}__${row[2]}`, row);
+          // 2) Escuchar colección completa de OTs diarias
+          db.collection('almacen_ots').onSnapshot(snapshot => {
+            if (snapshot.empty) {
+              if (!state.cloud.seeded) {
+                state.cloud.seeded = true;
+                flushCloudOtSync();
+                syncMetaToCloud();
+              }
+              return;
+            }
+
+            let activeRemoteUpdate = null;
+            snapshot.forEach(doc => {
+              const data = doc.data();
+              if (!data || !Array.isArray(data.items)) return;
+              const entry = { ...data, docId: doc.id };
+              state.otHistory[doc.id] = entry;
+              if (doc.id === state.activeOtDocId) {
+                activeRemoteUpdate = entry;
+              }
             });
-            const mergedArr = Array.from(merged.values());
-            if (mergedArr.length !== localCustom.length) {
-              try { localStorage.setItem(STORAGE_KEYS.customCatalog, JSON.stringify(mergedArr)); } catch (e) {}
-              buildCatalog();
-              renderZoneButtons();
-              renderLineButtons();
-              renderCatalogResults();
+
+            saveLocalHistoryCache();
+
+            const isOwnRecentWrite = (Date.now() - state.cloud.lastLocalWriteTs) < 1500;
+            const isTyping = document.activeElement && (
+              document.activeElement.tagName === 'INPUT' ||
+              document.activeElement.tagName === 'TEXTAREA'
+            );
+
+            if (activeRemoteUpdate && activeRemoteUpdate.updatedBy !== state.cloud.clientId && !isOwnRecentWrite && !state.cloud.pendingSync) {
+              applyOtDocToActiveState(activeRemoteUpdate, state.activeOtDocId, { skipRender: Boolean(isTyping) });
             }
-          }
 
-          if (!isOwnEcho && data.activeOtDocId && data.activeOtDocId !== state.activeOtDocId) {
-            const target = state.otHistory[data.activeOtDocId];
-            if (target) {
-              applyOtDocToActiveState(target, data.activeOtDocId);
-              showToast(`Sincronizado desde la nube: OT ${target.ot}`);
+            if (!document.getElementById('historyModal').classList.contains('hidden')) {
+              renderHistoryModal();
             }
-          }
-        }, err => {
-          console.error('[Firestore meta listener]', err);
-        });
-      } catch (err) {
-        console.error('[Firebase init]', err);
-        setCloudStatus('local', 'MODO LOCAL');
-      }
-    }
-
-    // ==================== 10. MODALES: IMPORTADOR JSON E HISTORIAL ====================
-    function openJsonModal() {
-      document.getElementById('jsonImportError').classList.add('hidden');
-      document.getElementById('jsonModal').classList.remove('hidden');
-    }
-
-    function closeJsonModal() {
-      document.getElementById('jsonModal').classList.add('hidden');
-    }
-
-    function handleImportOtJson() {
-      const raw = document.getElementById('jsonInputArea').value.trim();
-      const errEl = document.getElementById('jsonImportError');
-      errEl.classList.add('hidden');
-
-      if (!raw) {
-        errEl.textContent = 'Pega el código JSON de tu OT antes de importar.';
-        errEl.classList.remove('hidden');
-        return;
-      }
-
-      try {
-        const cleaned = raw.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
-        const parsed = JSON.parse(cleaned);
-        const itemsRaw = Array.isArray(parsed) ? parsed : (parsed.items || parsed.productos || []);
-        if (!Array.isArray(itemsRaw) || !itemsRaw.length) {
-          throw new Error('El JSON debe incluir un arreglo "items" con al menos un producto.');
-        }
-
-        const newOtNum = String(parsed.ot || 'Importada');
-        const newDocId = sanitizeOtDocId(newOtNum);
-
-        if (state.cloud.pendingSync) flushCloudOtSync();
-
-        state.activeOtDocId = newDocId;
-        state.ot = {
-          ot: newOtNum,
-          fecha: String(parsed.fecha || new Date().toLocaleDateString('es-PE')),
-          items: itemsRaw.map((it, idx) => enrichOtItem(it, idx))
+          }, err => {
+            console.warn('[Firestore OTs listener]', err);
+            setCloudStatus(navigator.onLine ? 'error' : 'offline');
+          });
         };
 
-        const existingHist = state.otHistory[newDocId];
-        state.reversoProgress = (existingHist && existingHist.progress) ? existingHist.progress : {};
-        state.extraSobrantes = (existingHist && Array.isArray(existingHist.extraSobrantes)) ? existingHist.extraSobrantes : [];
-
-        persistActiveOtLocally();
-        scheduleCloudSyncOt(true);
-        syncMetaToCloud();
-
-        updateOtHeaderBadges();
-        closeJsonModal();
-        document.getElementById('jsonInputArea').value = '';
-        switchTab('reverso');
-        showToast(`OT ${state.ot.ot} guardada (${state.ot.items.length} productos)`);
+        if (firebase.auth) {
+          firebase.auth().signInAnonymously()
+            .then(startListeners)
+            .catch(() => startListeners());
+        } else {
+          startListeners();
+        }
       } catch (err) {
-        errEl.textContent = `Error al leer JSON: ${err.message}`;
-        errEl.classList.remove('hidden');
+        console.warn('[Firebase init]', err);
+        setCloudStatus('error');
       }
     }
 
     function openHistoryModal() {
-      upsertLocalHistoryFromActive();
       renderHistoryModal();
       document.getElementById('historyModal').classList.remove('hidden');
     }
@@ -3502,24 +3767,24 @@ Reglas obligatorias:
 
     function renderHistoryModal() {
       const listEl = document.getElementById('historyList');
-      const hintEl = document.getElementById('historyCloudHint');
-      if (hintEl) {
-        hintEl.textContent = state.cloud.ready
-          ? (navigator.onLine ? '● Sincronizado en tiempo real con Firestore' : '● Modo Offline: se subirá al volver internet')
-          : 'Guardado localmente en este dispositivo';
-      }
+      if (!listEl) return;
 
-      const entries = Object.entries(state.otHistory || {})
-        .map(([docId, data]) => ({ docId, ...data }))
+      const entries = Object.values(state.otHistory || {})
+        .filter(e => e && Array.isArray(e.items))
         .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+
+      if (!entries.length) {
+        listEl.innerHTML = `<p class="text-xs text-slate-400 text-center py-6">Aún no hay OTs guardadas en el historial.</p>`;
+        return;
+      }
 
       listEl.innerHTML = entries.map(entry => {
         const isActive = entry.docId === state.activeOtDocId;
-        const items = Array.isArray(entry.items) ? entry.items.map((it, idx) => enrichOtItem(it, idx)) : [];
-        const entryStats = computeOtStats(items, entry.progress || {}, entry.extraSobrantes || []);
+        const enriched = entry.items.map((it, idx) => enrichOtItem(it, idx));
+        const entryStats = computeOtStats(enriched, entry.progress || {}, entry.extraSobrantes || []);
         const updatedText = entry.updatedAt
-          ? new Date(entry.updatedAt).toLocaleString('es-PE', { dateStyle: 'short', timeStyle: 'short' })
-          : '—';
+          ? new Date(entry.updatedAt).toLocaleString('es-PE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+          : '';
 
         return `
           <article class="rounded-2xl border p-4 space-y-3 transition ${
@@ -3562,8 +3827,10 @@ Reglas obligatorias:
       if (!target) return;
       if (state.cloud.pendingSync) flushCloudOtSync();
       state.reversoDamageOpen = {};
-      state.graceVisibleKeys = {};
+      clearAllGraceTimers();
       state.revLines = [];
+      state.revCompletedOpen = false;
+      state.revCompletedManualOverride = null;
       applyOtDocToActiveState(target, docId);
       syncMetaToCloud();
       closeHistoryModal();
@@ -3647,13 +3914,34 @@ Reglas obligatorias:
       state.revQuickQtys = [];
       state.revStatusFilters = [];
       state.revOnlyPending = false;
+      state.revCompletedManualOverride = null;
       state.revSearch = target.codigo;
       const revInp = document.getElementById('revSearchInput');
       if (revInp) revInp.value = target.codigo;
       const revQtyInp = document.getElementById('revQtyInput');
       if (revQtyInp) revQtyInp.value = '';
+
+      clearTimeout(state.highlightTimer);
+      state.highlightedOtKey = itemKey;
       switchTab('reverso');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      requestAnimationFrame(() => {
+        const cards = document.querySelectorAll('#viewReverso [data-rev-card]');
+        const cardEl = Array.from(cards).find(el => el.dataset.revCard === itemKey);
+        if (cardEl) {
+          cardEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        } else {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+      });
+
+      state.highlightTimer = setTimeout(() => {
+        state.highlightedOtKey = '';
+        document.querySelectorAll('#viewReverso .rev-card-highlight').forEach(el => {
+          el.classList.remove('rev-card-highlight');
+        });
+      }, 2600);
+
       showToast(`Ubicado en OT: ${target.posicion} (${target.codigo})`);
     }
 
@@ -3744,7 +4032,7 @@ Reglas obligatorias:
                     </div>
 
                     <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
-                      <span class="px-2.5 py-1 rounded-lg bg-abyss border border-slate-800 text-slate-300">Meta: <strong class="text-white">${item.meta}</strong></span>
+                      <span class="px-2.5 py-1 rounded-lg bg-abyss border border-slate-800 text-slate-300">Meta ERP: <strong class="text-white">${item.meta}</strong></span>
                       <span class="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-200">Buenos: <strong>${prog.buenos}</strong></span>
                       <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 border border-amber-400/60 text-amber-200 font-extrabold">Dañados: ${prog.danados}</span>
                     </div>
@@ -4414,10 +4702,12 @@ Reglas obligatorias:
       // Filtros e interacciones en Reverso (OT - Fase 2 + Filtros avanzados)
       document.getElementById('revSearchInput').addEventListener('input', e => {
         state.revSearch = e.target.value;
+        state.revCompletedManualOverride = null;
         renderReversoView();
       });
       document.getElementById('btnClearRevSearch').addEventListener('click', () => {
         state.revSearch = '';
+        state.revCompletedManualOverride = null;
         document.getElementById('revSearchInput').value = '';
         renderReversoView();
       });
@@ -4515,6 +4805,7 @@ Reglas obligatorias:
         state.revQuickQtys = [];
         state.revStatusFilters = [];
         state.revOnlyPending = false;
+        state.revCompletedManualOverride = null;
         document.getElementById('revSearchInput').value = '';
         document.getElementById('revQtyInput').value = '';
         renderReversoView();
@@ -4550,16 +4841,30 @@ Reglas obligatorias:
         btnResetRev.classList.remove('bg-rose-500/30', 'text-white', 'border-rose-400');
         state.reversoProgress = {};
         state.reversoDamageOpen = {};
-        state.graceVisibleKeys = {};
+        clearAllGraceTimers();
+        state.revCompletedOpen = false;
+        state.revCompletedManualOverride = null;
         persistActiveOtLocally();
         scheduleCloudSyncOt(true);
         renderReversoView();
         showToast(`Conteo de OT ${state.ot.ot} reiniciado a 0`);
       });
 
-      // Delegación de eventos en las tarjetas interactivas de Reverso
-      const revListEl = document.getElementById('reversoList');
-      revListEl.addEventListener('click', e => {
+      // Toggle del acordeón inferior de Productos completados (respeta override manual)
+      const btnToggleCompleted = document.getElementById('btnToggleCompletedSection');
+      if (btnToggleCompleted) {
+        btnToggleCompleted.addEventListener('click', () => {
+          const bodyEl = document.getElementById('reversoCompletedBody');
+          const currentlyOpen = bodyEl ? !bodyEl.classList.contains('hidden') : Boolean(state.revCompletedOpen);
+          const nextOpen = !currentlyOpen;
+          state.revCompletedOpen = nextOpen;
+          state.revCompletedManualOverride = nextOpen;
+          renderReversoView();
+        });
+      }
+
+      // Delegación compartida de eventos en tarjetas de Reverso (pendientes + completados)
+      const handleReversoCardClick = e => {
         const copyBtn = e.target.closest('[data-rev-copy]');
         if (copyBtn) {
           copyTextToClipboard(copyBtn.dataset.revCopy, `Copiado: ${copyBtn.dataset.revCopy}`);
@@ -4575,6 +4880,11 @@ Reglas obligatorias:
           updateItemProgress(key, p => { p.buenos += 1; });
         } else if (action === 'dec') {
           updateItemProgress(key, p => { p.buenos = Math.max(0, p.buenos - 1); });
+        } else if (action === 'add-step') {
+          const delta = parseInt(btn.dataset.step, 10) || 0;
+          if (delta !== 0) {
+            updateItemProgress(key, p => { p.buenos = Math.max(0, p.buenos + delta); });
+          }
         } else if (action === 'fill-meta') {
           updateItemProgress(key, (p, item) => {
             p.buenos = Math.max(0, item.meta - p.danados);
@@ -4598,6 +4908,7 @@ Reglas obligatorias:
           showToast('Producto revertido a 0');
         } else if (action === 'toggle-damage') {
           state.reversoDamageOpen[key] = !state.reversoDamageOpen[key];
+          if (state.graceVisibleKeys[key]) grantGraceVisibility(key);
           renderReversoView();
         } else if (action === 'dmg-inc') {
           updateItemProgress(key, p => { p.danados += 1; });
@@ -4616,24 +4927,31 @@ Reglas obligatorias:
             p.motivo = p.motivo === reason ? '' : reason;
           }, { silent: true });
         }
-      });
+      };
 
       // Campos numéricos editables (buenos / dañados) sin perder foco al escribir
-      revListEl.addEventListener('change', e => {
+      const handleReversoCardChange = e => {
         const inp = e.target.closest('[data-rev-input]');
         if (!inp) return;
         const field = inp.dataset.revInput;
         const key = inp.dataset.key;
         const val = Math.max(0, parseInt(inp.value, 10) || 0);
         updateItemProgress(key, p => { p[field] = val; });
-      });
+      };
 
       // Nota corta de daño: guarda en vivo sin re-renderizar para mantener el teclado fluido
-      revListEl.addEventListener('input', e => {
+      const handleReversoCardInput = e => {
         const noteInp = e.target.closest('[data-rev-note]');
         if (!noteInp) return;
         const key = noteInp.dataset.revNote;
         updateItemProgress(key, p => { p.nota = noteInp.value; }, { skipRender: true, silent: true });
+      };
+
+      [document.getElementById('reversoList'), document.getElementById('reversoCompletedList')].forEach(containerEl => {
+        if (!containerEl) return;
+        containerEl.addEventListener('click', handleReversoCardClick);
+        containerEl.addEventListener('change', handleReversoCardChange);
+        containerEl.addEventListener('input', handleReversoCardInput);
       });
       document.getElementById('btnClearSearch').addEventListener('click', () => {
         state.search = '';
