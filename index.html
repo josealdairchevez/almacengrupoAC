@@ -153,7 +153,7 @@
               </span>
             </div>
             <p class="text-xs text-slate-400 truncate mt-0.5" aria-live="polite">
-              Catálogo: <span id="visibleCount" class="font-mono font-bold text-cyan-400">399</span> / <span id="totalCount" class="font-mono font-semibold text-slate-200">399</span>
+              Catálogo: <span id="visibleCount" class="font-mono font-bold text-cyan-400">400</span> / <span id="totalCount" class="font-mono font-semibold text-slate-200">400</span>
               <span class="text-slate-600 mx-1">·</span>
               OT activa:
               <button
@@ -209,7 +209,7 @@
         >
           <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
           <span class="truncate">Buscador</span>
-          <span id="badgeCatalogCount" class="font-mono text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-200">399</span>
+          <span id="badgeCatalogCount" class="font-mono text-[10px] sm:text-xs px-1.5 py-0.5 rounded-md bg-cyan-500/20 text-cyan-200">400</span>
         </button>
 
         <button
@@ -448,43 +448,135 @@
         <!-- Tarjetas KPI interactivas para filtrar por estado -->
         <div id="revKpiGrid" class="grid grid-cols-2 sm:grid-cols-4 gap-2"></div>
 
-        <!-- Buscador, filtro rápido Solo Pendientes y almacén dentro de la OT -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-2.5 pt-2 border-t border-slate-800/80">
-          <div class="lg:col-span-5 relative">
-            <svg class="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-            <input
-              id="revSearchInput"
-              type="search"
-              autocomplete="off"
-              placeholder="Buscar producto, código o posición en la OT..."
-              class="w-full pl-10 pr-9 py-2.5 rounded-xl bg-abyss border border-slate-700/90 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition"
-            />
-            <button
-              type="button"
-              id="btnClearRevSearch"
-              class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
-              aria-label="Limpiar búsqueda de OT"
-            >✕</button>
+        <!-- Panel completo de búsqueda, ordenamiento y filtros dinámicos en Reverso -->
+        <div class="pt-3 border-t border-slate-800/80 space-y-3.5">
+          <!-- Fila 1: Búsqueda + Presentación manual + Ordenar por -->
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-2.5">
+            <div class="md:col-span-5 space-y-1">
+              <label for="revSearchInput" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Buscar producto, código o posición <span class="text-slate-500 font-normal">(Atajo: /)</span>
+              </label>
+              <div class="relative">
+                <svg class="w-4 h-4 text-amber-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <input
+                  id="revSearchInput"
+                  type="search"
+                  autocomplete="off"
+                  placeholder="Ej: ricocan 15, M0005, takis..."
+                  class="w-full pl-10 pr-9 py-2.5 rounded-xl bg-abyss border border-slate-700/90 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition"
+                />
+                <button
+                  type="button"
+                  id="btnClearRevSearch"
+                  class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+                  aria-label="Limpiar búsqueda de OT"
+                >✕</button>
+              </div>
+            </div>
+
+            <div class="md:col-span-4 space-y-1">
+              <label for="revQtyInput" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Cantidad / Presentación
+              </label>
+              <div class="relative">
+                <input
+                  id="revQtyInput"
+                  type="text"
+                  autocomplete="off"
+                  placeholder="Ej: 15 kg, 2 lt, lat, plch..."
+                  class="w-full pl-3.5 pr-9 py-2.5 rounded-xl bg-abyss border border-slate-700/90 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition"
+                />
+                <button
+                  type="button"
+                  id="btnClearRevQty"
+                  class="hidden absolute right-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer"
+                  aria-label="Limpiar filtro de presentación"
+                >✕</button>
+              </div>
+            </div>
+
+            <div class="md:col-span-3 space-y-1">
+              <label for="revSortSelect" class="block text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Ordenar por
+              </label>
+              <select
+                id="revSortSelect"
+                class="w-full px-3.5 py-2.5 rounded-xl bg-abyss border border-slate-700/90 text-sm text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/20 transition cursor-pointer"
+              >
+                <option value="posicion">Posición (A0001 → Z)</option>
+                <option value="articulo">Artículo (A → Z)</option>
+                <option value="codigo">Código</option>
+                <option value="meta_desc">Meta ERP (Mayor → Menor)</option>
+              </select>
+            </div>
           </div>
 
-          <div class="lg:col-span-4 flex flex-wrap items-center gap-1.5" id="revZoneBar"></div>
+          <!-- Fila 2: Barra de control rápido (Solo pendientes + Toggle filtros + Resultados + Limpiar) -->
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                id="btnToggleOnlyPending"
+                aria-pressed="false"
+                class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95"
+              >
+                <span id="onlyPendingDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+                <span>Solo pendientes</span>
+              </button>
 
-          <div class="lg:col-span-3 flex items-center lg:justify-end gap-2">
-            <button
-              type="button"
-              id="btnToggleOnlyPending"
-              aria-pressed="false"
-              class="w-full lg:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95"
-            >
-              <span id="onlyPendingDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
-              <span>Solo pendientes</span>
-            </button>
-            <button
-              type="button"
-              id="btnResetRevFilters"
-              class="hidden shrink-0 px-2.5 py-2.5 rounded-xl text-xs font-bold text-amber-300 hover:text-amber-200 bg-abyss border border-amber-500/45 transition cursor-pointer active:scale-95"
-              title="Limpiar todos los filtros activos de la OT"
-            >Limpiar</button>
+              <button
+                type="button"
+                id="btnToggleRevAdvFilters"
+                aria-expanded="true"
+                class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border bg-abyss/90 text-amber-200 border-amber-500/40 hover:border-amber-400/70 transition cursor-pointer active:scale-95"
+              >
+                <svg id="revAdvChevron" class="w-3.5 h-3.5 transition-transform duration-200 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m6 9 6 6 6-6"/></svg>
+                <span>Filtros (Zona · Línea · Pres.)</span>
+                <span id="revAdvFilterCount" class="hidden px-1.5 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-amber-500/25 text-amber-100 border border-amber-400/50">0</span>
+              </button>
+            </div>
+
+            <div class="flex items-center gap-2">
+              <span id="revVisibleMatchesBadge" class="font-mono text-[11px] font-bold px-2.5 py-1.5 rounded-xl bg-abyss/90 border border-slate-800 text-slate-300">
+                Mostrando <strong class="text-amber-300">0</strong> / 0
+              </span>
+              <button
+                type="button"
+                id="btnResetRevFilters"
+                class="hidden shrink-0 px-3 py-1.5 rounded-xl text-xs font-extrabold text-amber-200 hover:text-white bg-amber-500/15 hover:bg-amber-500/25 border border-amber-400/50 transition cursor-pointer active:scale-95"
+                title="Limpiar todos los filtros activos de la OT"
+              >Limpiar filtros</button>
+            </div>
+          </div>
+
+          <!-- Panel desplegable: Almacén/Zona + Línea + Filtro rápido de presentación (Multiselección) -->
+          <div id="revAdvFiltersPanel" class="rounded-2xl border border-slate-800/90 bg-abyss/60 p-3.5 space-y-3">
+            <!-- Almacén / Zona -->
+            <div class="space-y-1.5">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Almacén / Zona</span>
+                <span id="revZoneActiveBadge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-amber-500/20 text-amber-200 border border-amber-400/50"></span>
+              </div>
+              <div class="flex flex-wrap items-center gap-1.5" id="revZoneBar"></div>
+            </div>
+
+            <!-- Línea -->
+            <div class="space-y-1.5 pt-2 border-t border-slate-800/70">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Línea en OT</span>
+                <span id="revLineActiveBadge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-cyan-500/20 text-cyan-200 border border-cyan-400/50"></span>
+              </div>
+              <div id="revLineBar" class="flex flex-wrap gap-1.5"></div>
+            </div>
+
+            <!-- Chips rápidos de presentación -->
+            <div class="space-y-1.5 pt-2 border-t border-slate-800/70">
+              <div class="flex items-center gap-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Filtro rápido de presentación</span>
+                <span id="revQuickQtyActiveBadge" class="hidden px-2 py-0.5 rounded-md text-[10px] font-mono font-extrabold bg-amber-500/20 text-amber-200 border border-amber-400/50"></span>
+              </div>
+              <div id="revQuickQtyBar" class="flex flex-wrap gap-1.5"></div>
+            </div>
           </div>
         </div>
 
@@ -1331,7 +1423,7 @@ Reglas obligatorias:
       ["142,039","CAMOTE FRITO INKA CHIPS SALADO HOSO TIR. X 6 UND.","N0040","N"],
       ["146,029","BIMBOLETE VAINILLA BOL. X 2 KEKITOS X 0.070 KG.","N0041","N"],
       ["142,007","PAPA NATIVA FRITA INKA CHIPS SALADA HOSO (PERU) BO","N0042","N"],
-      // LÍNEA O (50: 47 base + 3 nuevos)
+      // LÍNEA O (51: 47 base + 4 nuevos)
       ["305,001","XTASIS VODKA TROPICAL BLUE BOT. X 2 LT.","O0001","O"],
       ["305,002","XTASIS VODKA MARACUYA BOT. X 2 LT.","O0002","O"],
       ["305,005","XTASIS VODKA PIÑA COLADA BOT. X 2 LT.","O0003","O"],
@@ -1382,6 +1474,7 @@ Reglas obligatorias:
       ["142,044","PLATANO FRITO INKA CHIPS CHORIZO CAMPESTRE TIR. 06 X 0.030 KG.","O0600","O"],
       ["142,045","PLATANO FRITO INKA CHIPS CHORIZO CAMPESTRE BOL. X 0.130 KG.","O0610","O"],
       ["142,046","PAPA FRITA INKA CHIPS CHORIZO PARRILLERO TIR. 06 X 0.030 KG.","O0620","O"],
+      ["142,047","PAPA FRITA INKA CHIPS CHORIZO PARRILLERO BOL. X 0.130 KG.","O0630","O"],
       // LÍNEA P (14)
       ["314,001","PAPEL HIGIENICO SUPER PLUS 20 M. PLCH. 2 X 24 ROL.","P0001","P"],
       ["314,002","PAPEL HIGIENICO SUPER PLUS 25 M. PLCH. 6 X 4 ROL.","P0002","P"],
@@ -1739,6 +1832,11 @@ Reglas obligatorias:
       extraSobrantes: [],
       revSearch: '',
       revZones: [],         // Vacío = Todos; permite combinar múltiples almacenes en la OT
+      revLines: [],         // Vacío = Todas; permite combinar múltiples líneas en la OT
+      revQty: '',           // Filtro manual de cantidad / presentación en la OT
+      revQuickQtys: [],     // Vacío = Todas; permite combinar chips rápidos de presentación en la OT
+      revSort: 'posicion',  // Ordenamiento dinámico en la OT
+      revFiltersOpen: true, // Panel plegable de filtros avanzados en Reverso
       revStatusFilters: [], // Vacío = Todos; permite combinar estados y desglose de incidencias
       revOnlyPending: false,
       incFilters: [],       // Vacío = Todas; permite combinar Dañados, Faltantes y Sobrantes
@@ -2068,7 +2166,11 @@ Reglas obligatorias:
         meta,
         posicion,
         linea,
-        zone
+        zone,
+        normArt: normalizeText(`${nombre} ${presentacion}`),
+        normPos: normalizeText(posicion),
+        normCode: normalizeText(codigo).replace(/,/g, ''),
+        normPres: normalizeText(presentacion)
       };
     }
 
@@ -2281,10 +2383,10 @@ Reglas obligatorias:
       if (!btn || !dot) return;
       btn.setAttribute('aria-pressed', String(state.revOnlyPending));
       if (state.revOnlyPending) {
-        btn.className = 'w-full lg:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold border bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20 transition cursor-pointer active:scale-95';
+        btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20 transition cursor-pointer active:scale-95';
         dot.className = 'w-2 h-2 rounded-full bg-cyan-300 animate-pulse';
       } else {
-        btn.className = 'w-full lg:w-auto inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95';
+        btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95';
         dot.className = 'w-2 h-2 rounded-full bg-slate-500';
       }
     }
@@ -2465,6 +2567,29 @@ Reglas obligatorias:
       }
     }
 
+    function getAvailableLinesForRevZones() {
+      const allowed = new Set();
+      if (!state.revZones.length) {
+        ALL_LINES_ORDER.forEach(l => allowed.add(l));
+      } else {
+        state.revZones.forEach(zId => {
+          (ZONES[zId]?.lines || []).forEach(l => allowed.add(l));
+        });
+      }
+      // Incluye también cualquier línea presente en los ítems de la OT que coincida con las zonas activas
+      const presentCounts = {};
+      state.ot.items.forEach(it => {
+        if (!state.revZones.length || state.revZones.includes(it.zone)) {
+          presentCounts[it.linea] = (presentCounts[it.linea] || 0) + 1;
+        }
+      });
+      const ordered = ALL_LINES_ORDER.filter(l => allowed.has(l) && presentCounts[l] > 0);
+      Object.keys(presentCounts).forEach(l => {
+        if (!ordered.includes(l)) ordered.push(l);
+      });
+      return { lines: ordered, counts: presentCounts };
+    }
+
     function renderReversoView() {
       const stats = updateIncidentMetrics();
       document.getElementById('revOtTitle').textContent = state.ot.ot || 'Personalizada';
@@ -2477,11 +2602,30 @@ Reglas obligatorias:
       document.getElementById('revProgressBar').style.width = `${stats.pct}%`;
 
       document.getElementById('btnClearRevSearch').classList.toggle('hidden', !state.revSearch);
+      const btnClearRevQty = document.getElementById('btnClearRevQty');
+      if (btnClearRevQty) btnClearRevQty.classList.toggle('hidden', !state.revQty);
       updateOnlyPendingUI();
+
+      // Estado del panel plegable de filtros avanzados y contador de filtros activos
+      const advPanel = document.getElementById('revAdvFiltersPanel');
+      const advChevron = document.getElementById('revAdvChevron');
+      const advBtn = document.getElementById('btnToggleRevAdvFilters');
+      const advCountBadge = document.getElementById('revAdvFilterCount');
+      const advActiveTotal = state.revZones.length + state.revLines.length + state.revQuickQtys.length;
+      if (advPanel) advPanel.classList.toggle('hidden', !state.revFiltersOpen);
+      if (advChevron) advChevron.classList.toggle('rotate-180', state.revFiltersOpen);
+      if (advBtn) advBtn.setAttribute('aria-expanded', String(state.revFiltersOpen));
+      if (advCountBadge) {
+        advCountBadge.classList.toggle('hidden', advActiveTotal === 0);
+        if (advActiveTotal > 0) advCountBadge.textContent = String(advActiveTotal);
+      }
 
       const hasRevFilters = Boolean(
         state.revSearch ||
+        state.revQty ||
         state.revZones.length ||
+        state.revLines.length ||
+        state.revQuickQtys.length ||
         state.revStatusFilters.length ||
         state.revOnlyPending
       );
@@ -2546,16 +2690,22 @@ Reglas obligatorias:
         subBar.classList.remove('flex');
       }
 
-      // Filtros por almacén dentro de la OT (multiselección)
+      // 1) Filtros por Almacén / Zona dentro de la OT (multiselección)
       const counts = { ALL: state.ot.items.length, ALM1: 0, ALM2: 0, P: 0, Z: 0 };
       state.ot.items.forEach(it => { counts[it.zone] = (counts[it.zone] || 0) + 1; });
 
+      const revZoneBadge = document.getElementById('revZoneActiveBadge');
+      if (revZoneBadge) {
+        revZoneBadge.classList.toggle('hidden', !state.revZones.length);
+        if (state.revZones.length) revZoneBadge.textContent = `${state.revZones.length} selec.`;
+      }
+
       const zoneChips = [
         { id: 'ALL', label: `Todos (${counts.ALL})` },
-        { id: 'ALM1', label: `Alm. 1 (${counts.ALM1})` },
-        { id: 'ALM2', label: `Alm. 2 (${counts.ALM2})` },
-        { id: 'P', label: `P (${counts.P})` },
-        { id: 'Z', label: `Z (${counts.Z})` }
+        { id: 'ALM1', label: `Almacén 1 · J–O (${counts.ALM1})` },
+        { id: 'ALM2', label: `Almacén 2 · A–G (${counts.ALM2})` },
+        { id: 'P', label: `Línea P (${counts.P})` },
+        { id: 'Z', label: `Superior Z (${counts.Z})` }
       ];
 
       document.getElementById('revZoneBar').innerHTML = zoneChips.map(z => {
@@ -2566,20 +2716,103 @@ Reglas obligatorias:
             type="button"
             data-rev-zone="${z.id}"
             aria-pressed="${active}"
-            class="px-2.5 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
+            class="px-3 py-1.5 rounded-xl text-xs font-bold border transition cursor-pointer ${
               active
-                ? 'bg-amber-500/20 text-amber-200 border-amber-400'
-                : 'bg-abyss text-slate-300 border-slate-800 hover:border-slate-700'
+                ? 'bg-amber-500/20 text-amber-200 border-amber-400 shadow-sm shadow-amber-500/15'
+                : 'bg-panel text-slate-300 border-slate-800 hover:border-slate-700'
             }"
           >${prefix}${z.label}</button>
         `;
       }).join('');
 
+      // 2) Filtros por Línea dentro de la OT (dinámico por almacén + conteo de SKUs)
+      const { lines: availableRevLines, counts: revLineCounts } = getAvailableLinesForRevZones();
+      const revLineBadge = document.getElementById('revLineActiveBadge');
+      if (revLineBadge) {
+        revLineBadge.classList.toggle('hidden', !state.revLines.length);
+        if (state.revLines.length) revLineBadge.textContent = `${state.revLines.length} selec.`;
+      }
+
+      const revLineBar = document.getElementById('revLineBar');
+      if (revLineBar) {
+        const allLinesActive = state.revLines.length === 0;
+        const lineBtns = [
+          `<button type="button" data-rev-line="ALL" aria-pressed="${allLinesActive}" class="px-2.5 py-1 rounded-lg text-xs font-mono font-bold border transition cursor-pointer ${
+            allLinesActive
+              ? 'bg-cyan-500/20 text-cyan-200 border-cyan-400'
+              : 'bg-panel text-slate-400 border-slate-800 hover:text-white'
+          }">Todas</button>`
+        ];
+
+        availableRevLines.forEach(l => {
+          const active = state.revLines.includes(l);
+          const cnt = revLineCounts[l] || 0;
+          lineBtns.push(`
+            <button
+              type="button"
+              data-rev-line="${l}"
+              aria-pressed="${active}"
+              class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-extrabold border transition cursor-pointer ${
+                active
+                  ? 'bg-cyan-500/25 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/20'
+                  : 'bg-panel text-slate-200 border-slate-800 hover:border-slate-600'
+              }"
+            ><span>${l}</span><span class="text-[10px] font-semibold ${active ? 'text-cyan-200/90' : 'text-slate-500'}">${cnt}</span></button>
+          `);
+        });
+        revLineBar.innerHTML = lineBtns.join('');
+      }
+
+      // 3) Chips rápidos de presentación en la OT (multiselección)
+      const revQuickBadge = document.getElementById('revQuickQtyActiveBadge');
+      if (revQuickBadge) {
+        revQuickBadge.classList.toggle('hidden', !state.revQuickQtys.length);
+        if (state.revQuickQtys.length) revQuickBadge.textContent = `${state.revQuickQtys.length} activos`;
+      }
+
+      const revQuickBar = document.getElementById('revQuickQtyBar');
+      if (revQuickBar) {
+        const allQuickActive = state.revQuickQtys.length === 0;
+        const allQuickBtn = `
+          <button
+            type="button"
+            data-rev-qty="ALL"
+            aria-pressed="${allQuickActive}"
+            class="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition cursor-pointer ${
+              allQuickActive
+                ? 'bg-amber-500/20 text-amber-200 border-amber-400'
+                : 'bg-panel text-slate-400 border-slate-800 hover:text-slate-200'
+            }"
+          >Todas</button>
+        `;
+        const quickChipsHtml = QUICK_QTY_FILTERS.map(chip => {
+          const active = state.revQuickQtys.includes(chip.value);
+          return `
+            <button
+              type="button"
+              data-rev-qty="${chip.value}"
+              aria-pressed="${active}"
+              class="px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold border transition cursor-pointer ${
+                active
+                  ? 'bg-amber-500/20 text-amber-200 border-amber-400 shadow-sm shadow-amber-500/15'
+                  : 'bg-panel text-slate-400 border-slate-800 hover:text-slate-200'
+              }"
+            >${active ? '✓ ' : ''}${chip.label}</button>
+          `;
+        }).join('');
+        revQuickBar.innerHTML = allQuickBtn + quickChipsHtml;
+      }
+
       const q = normalizeText(state.revSearch);
       const qNoComma = q.replace(/,/g, '');
+      const tokens = q ? q.split(' ').filter(Boolean) : [];
 
       const visible = state.ot.items.filter(it => {
         if (state.revZones.length && !state.revZones.includes(it.zone)) return false;
+        if (state.revLines.length && !state.revLines.includes(it.linea)) return false;
+        if (state.revQty && !matchesQtyFilter(it, state.revQty)) return false;
+        if (state.revQuickQtys.length && !state.revQuickQtys.some(qVal => matchesQtyFilter(it, qVal))) return false;
+
         const prog = getProgressForKey(it.key);
         const st = evaluateItemStatus(it, prog);
 
@@ -2599,10 +2832,26 @@ Reglas obligatorias:
           if (!matchesStatus) return false;
         }
 
-        if (!q) return true;
-        const hay = `${normalizeText(it.nombre)} ${normalizeText(it.posicion)} ${normalizeText(it.codigo)} ${normalizeText(it.codigo).replace(/,/g, '')}`;
-        return hay.includes(q) || hay.includes(qNoComma);
+        if (tokens.length) {
+          const combined = `${it.normArt} ${it.normPos} ${it.normCode} ${normalizeText(it.codigo)}`;
+          const matchAll = tokens.every(tok => combined.includes(tok) || combined.includes(tok.replace(/,/g, '')));
+          if (!matchAll && !it.normCode.includes(qNoComma)) return false;
+        }
+        return true;
       });
+
+      // Ordenamiento dinámico en la OT
+      visible.sort((a, b) => {
+        if (state.revSort === 'articulo') return a.nombre.localeCompare(b.nombre, 'es');
+        if (state.revSort === 'codigo') return a.codigo.localeCompare(b.codigo, 'es', { numeric: true });
+        if (state.revSort === 'meta_desc') return (b.meta - a.meta) || a.posicion.localeCompare(b.posicion, 'es', { numeric: true });
+        return a.posicion.localeCompare(b.posicion, 'es', { numeric: true });
+      });
+
+      const matchesBadge = document.getElementById('revVisibleMatchesBadge');
+      if (matchesBadge) {
+        matchesBadge.innerHTML = `Mostrando <strong class="text-amber-300">${visible.length}</strong> / ${state.ot.items.length}`;
+      }
 
       const listEl = document.getElementById('reversoList');
       if (!visible.length) {
@@ -2762,14 +3011,14 @@ Reglas obligatorias:
                     data-rev-copy="${escapeHtml(it.posicion)}"
                     class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-cyan-500/15 text-cyan-300 border border-cyan-500/40 cursor-pointer active:scale-95 transition"
                     title="Copiar posición"
-                  >${escapeHtml(it.posicion)}</button>
+                  >${highlightMatches(it.posicion, state.revSearch)}</button>
                   <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${z.badgeClass}">${z.short}</span>
                   <button
                     type="button"
                     data-rev-copy="${escapeHtml(it.codigo)}"
                     class="font-mono text-[11px] text-slate-400 hover:text-slate-200 cursor-pointer"
                     title="Copiar código"
-                  >${escapeHtml(it.codigo)}</button>
+                  >${highlightMatches(it.codigo, state.revSearch)}</button>
                 </div>
                 <div class="flex items-center gap-1.5 flex-wrap justify-end">
                   <span class="font-mono text-xs font-extrabold px-2 py-0.5 rounded-lg bg-abyss text-amber-300 border border-amber-500/40">
@@ -2779,7 +3028,7 @@ Reglas obligatorias:
                 </div>
               </div>
               <h3 class="text-sm font-bold text-white leading-snug">${highlightMatches(it.nombre, state.revSearch)}</h3>
-              <p class="font-mono text-[11px] text-slate-400">${escapeHtml(it.presentacion)}</p>
+              <p class="font-mono text-[11px] text-slate-400">${highlightMatches(it.presentacion, state.revSearch)}</p>
             </div>
 
             ${summaryStrip}
@@ -3314,6 +3563,7 @@ Reglas obligatorias:
       if (state.cloud.pendingSync) flushCloudOtSync();
       state.reversoDamageOpen = {};
       state.graceVisibleKeys = {};
+      state.revLines = [];
       applyOtDocToActiveState(target, docId);
       syncMetaToCloud();
       closeHistoryModal();
@@ -3392,11 +3642,16 @@ Reglas obligatorias:
       const target = state.ot.items.find(it => it.key === itemKey);
       if (!target) return;
       state.revZones = [];
+      state.revLines = [];
+      state.revQty = '';
+      state.revQuickQtys = [];
       state.revStatusFilters = [];
       state.revOnlyPending = false;
       state.revSearch = target.codigo;
       const revInp = document.getElementById('revSearchInput');
       if (revInp) revInp.value = target.codigo;
+      const revQtyInp = document.getElementById('revQtyInput');
+      if (revQtyInp) revQtyInp.value = '';
       switchTab('reverso');
       window.scrollTo({ top: 0, behavior: 'smooth' });
       showToast(`Ubicado en OT: ${target.posicion} (${target.codigo})`);
@@ -4103,34 +4358,33 @@ Reglas obligatorias:
         ]);
       });
 
-      let exportedMode = 'Incidencias';
-      // Si no hay incidencias, exporta el resumen completo de verificación de la OT
-      if (rows.length === 1) {
-        exportedMode = 'Resumen_OT';
+      // Si aún no hay incidencias registradas, exporta el estado completo de verificación de la OT
+      if (rows.length <= 1) {
         state.ot.items.forEach(item => {
           const prog = getProgressForKey(item.key);
           const st = evaluateItemStatus(item, prog);
           pushRow([
-            otNum, fecha, st.code.toUpperCase(), 'EN_OT', (ZONES[item.zone] || ZONES.Z).short, item.linea, item.posicion,
+            otNum, fecha, st.label, 'EN_OT', (ZONES[item.zone] || ZONES.Z).short, item.linea, item.posicion,
             item.codigo, item.nombre, item.presentacion, item.meta, prog.buenos,
-            prog.danados, st.faltante, st.sobrante, prog.motivo || '', prog.nota || ''
+            prog.danados, st.faltante || 0, st.sobrante || 0, prog.motivo || '', prog.nota || ''
           ]);
         });
       }
 
       try {
-        // BOM UTF-8 (\uFEFF) para abrir tildes y Ñ correctamente en Excel
-        const blob = new Blob(['\uFEFF' + rows.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+        // BOM UTF-8 para que Excel muestre tildes y Ñ correctamente
+        const csvContent = '\uFEFF' + rows.join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        const safeOt = String(otNum).replace(/[^a-zA-Z0-9_-]/g, '_');
         a.href = url;
-        a.download = `${exportedMode}_OT_${safeOt}.csv`;
+        const safeOt = String(otNum || 'reverso').replace(/[^a-zA-Z0-9_-]/g, '_');
+        a.download = `reporte_incidencias_OT_${safeOt}.csv`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        showToast(exportedMode === 'Incidencias' ? 'Excel (.CSV) de incidencias descargado' : 'Sin incidencias · Excel resumen de OT descargado');
+        showToast(`Excel (.CSV) de OT ${otNum} descargado`);
       } catch (err) {
         showToast('No se pudo exportar el archivo CSV');
       }
@@ -4139,25 +4393,25 @@ Reglas obligatorias:
     // ==================== 11. INICIALIZACIÓN Y EVENTOS ====================
     document.addEventListener('DOMContentLoaded', () => {
       buildCatalog();
+      loadInitialOtState();
       renderZoneButtons();
       renderLineButtons();
       renderQuickQtyButtons();
       renderCatalogResults();
-      loadInitialOtState();
       switchTab('buscador');
 
-      // Navegación entre las 3 pestañas
+      // Navegación entre las 3 pestañas principales
       document.getElementById('tabBtnBuscador').addEventListener('click', () => switchTab('buscador'));
       document.getElementById('tabBtnReverso').addEventListener('click', () => switchTab('reverso'));
       document.getElementById('tabBtnIncidencias').addEventListener('click', () => switchTab('incidencias'));
 
-      // Buscador (A–Z)
+      // Búsqueda principal en Buscador (A–Z)
       document.getElementById('searchInput').addEventListener('input', e => {
         state.search = e.target.value;
         renderCatalogResults();
       });
 
-      // Filtros e interacciones en Reverso (OT - Fase 2)
+      // Filtros e interacciones en Reverso (OT - Fase 2 + Filtros avanzados)
       document.getElementById('revSearchInput').addEventListener('input', e => {
         state.revSearch = e.target.value;
         renderReversoView();
@@ -4165,6 +4419,23 @@ Reglas obligatorias:
       document.getElementById('btnClearRevSearch').addEventListener('click', () => {
         state.revSearch = '';
         document.getElementById('revSearchInput').value = '';
+        renderReversoView();
+      });
+      document.getElementById('revQtyInput').addEventListener('input', e => {
+        state.revQty = e.target.value;
+        renderReversoView();
+      });
+      document.getElementById('btnClearRevQty').addEventListener('click', () => {
+        state.revQty = '';
+        document.getElementById('revQtyInput').value = '';
+        renderReversoView();
+      });
+      document.getElementById('revSortSelect').addEventListener('change', e => {
+        state.revSort = e.target.value;
+        renderReversoView();
+      });
+      document.getElementById('btnToggleRevAdvFilters').addEventListener('click', () => {
+        state.revFiltersOpen = !state.revFiltersOpen;
         renderReversoView();
       });
       document.getElementById('revZoneBar').addEventListener('click', e => {
@@ -4180,6 +4451,39 @@ Reglas obligatorias:
           if (state.revZones.length === Object.keys(ZONES).length) {
             state.revZones = [];
           }
+        }
+        // Conserva solo las líneas válidas para los almacenes seleccionados
+        const { lines: validLines } = getAvailableLinesForRevZones();
+        state.revLines = state.revLines.filter(l => validLines.includes(l));
+        renderReversoView();
+      });
+      document.getElementById('revLineBar').addEventListener('click', e => {
+        const btn = e.target.closest('[data-rev-line]');
+        if (!btn) return;
+        const lineId = btn.dataset.revLine;
+        if (lineId === 'ALL') {
+          state.revLines = [];
+        } else {
+          const idx = state.revLines.indexOf(lineId);
+          if (idx >= 0) state.revLines.splice(idx, 1);
+          else state.revLines.push(lineId);
+          const { lines: available } = getAvailableLinesForRevZones();
+          if (available.length > 1 && state.revLines.length === available.length) {
+            state.revLines = [];
+          }
+        }
+        renderReversoView();
+      });
+      document.getElementById('revQuickQtyBar').addEventListener('click', e => {
+        const btn = e.target.closest('[data-rev-qty]');
+        if (!btn) return;
+        const val = btn.dataset.revQty;
+        if (val === 'ALL') {
+          state.revQuickQtys = [];
+        } else {
+          const idx = state.revQuickQtys.indexOf(val);
+          if (idx >= 0) state.revQuickQtys.splice(idx, 1);
+          else state.revQuickQtys.push(val);
         }
         renderReversoView();
       });
@@ -4205,10 +4509,14 @@ Reglas obligatorias:
       });
       document.getElementById('btnResetRevFilters').addEventListener('click', () => {
         state.revSearch = '';
+        state.revQty = '';
         state.revZones = [];
+        state.revLines = [];
+        state.revQuickQtys = [];
         state.revStatusFilters = [];
         state.revOnlyPending = false;
         document.getElementById('revSearchInput').value = '';
+        document.getElementById('revQtyInput').value = '';
         renderReversoView();
         showToast('Filtros de Reverso limpiados');
       });
