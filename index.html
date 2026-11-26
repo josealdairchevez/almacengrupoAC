@@ -130,6 +130,30 @@
       border-color: rgba(34, 211, 238, 0.95) !important;
       animation: cardHighlightRing 1.1s ease-out 2;
     }
+
+    /* Fase 4: Modo Compacto encapsulado en Reverso */
+    #viewReverso.rev-compact #reversoList,
+    #viewReverso.rev-compact #reversoCompletedList {
+      gap: 0.5rem;
+    }
+    #viewReverso.rev-compact [data-rev-card] {
+      padding: 0.65rem 0.8rem;
+    }
+    #viewReverso.rev-compact [data-rev-card] > * + * {
+      margin-top: 0.45rem;
+    }
+    #viewReverso.rev-compact [data-rev-card] h3 {
+      font-size: 0.8125rem;
+      line-height: 1.25;
+    }
+    #viewReverso.rev-compact [data-rev-action="inc"],
+    #viewReverso.rev-compact [data-rev-action="dec"],
+    #viewReverso.rev-compact [data-rev-action="fill-meta"],
+    #viewReverso.rev-compact [data-rev-input="buenos"] {
+      min-height: 38px;
+      height: 38px;
+    }
+
     input[type="number"]::-webkit-inner-spin-button,
     input[type="number"]::-webkit-outer-spin-button {
       -webkit-appearance: none;
@@ -403,6 +427,16 @@
                 <span id="feedbackIcon">🔊</span>
                 <span id="feedbackLabel">Audio/Vibra</span>
               </button>
+              <button
+                type="button"
+                id="btnToggleWakeLock"
+                aria-pressed="false"
+                class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-slate-800/90 text-slate-300 border-slate-700 hover:border-cyan-400/60 hover:text-cyan-200 cursor-pointer transition active:scale-95"
+                title="Mantener encendida la pantalla del celular mientras cuentas"
+              >
+                <span id="wakeLockIcon">🌙</span>
+                <span id="wakeLockLabel">Pantalla auto</span>
+              </button>
             </div>
             <p class="text-xs text-slate-400">
               <span id="revReviewedSkus" class="font-mono font-bold text-emerald-400">0</span> / <span id="revTotalSkus" class="font-mono font-bold text-white">165</span> SKUs revisados
@@ -540,6 +574,17 @@
               >
                 <span id="onlyPendingDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
                 <span>Solo pendientes</span>
+              </button>
+
+              <button
+                type="button"
+                id="btnToggleCompactRev"
+                aria-pressed="false"
+                class="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95"
+                title="Reducir alto de tarjetas para ver más productos en pantalla"
+              >
+                <span id="compactRevIcon">▤</span>
+                <span id="compactRevLabel">Compacto</span>
               </button>
 
               <button
@@ -1002,12 +1047,9 @@
             class="w-full px-3.5 py-2.5 rounded-xl bg-abyss border border-slate-700/90 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-fuchsia-400"
           />
 
-          <label class="flex items-start gap-2.5 rounded-xl border border-cyan-500/35 bg-cyan-500/10 p-3 cursor-pointer">
-            <input id="newProdSaveCatalog" type="checkbox" checked class="mt-0.5 w-4 h-4 accent-cyan-400 rounded cursor-pointer" />
-            <span class="text-xs text-cyan-100 leading-snug">
-              <strong>Guardar también en el Buscador (A–Z) y nube</strong><br />
-              <span class="text-[11px] text-cyan-200/80">Quedará disponible permanentemente en tu celular y PC.</span>
-            </span>
+          <label class="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-abyss/80 border border-slate-800 cursor-pointer select-none">
+            <input id="newProdSaveCatalog" type="checkbox" checked class="w-4 h-4 rounded accent-cyan-400 cursor-pointer" />
+            <span class="text-xs font-semibold text-slate-200">Guardar también en el catálogo maestro (<strong class="text-cyan-300">Buscador A–Z</strong>)</span>
           </label>
 
           <p id="extraNewError" class="hidden text-xs font-semibold text-rose-400 bg-rose-500/10 border border-rose-500/30 rounded-lg px-3 py-2"></p>
@@ -1023,6 +1065,18 @@
       </div>
     </div>
   </div>
+
+  <!-- ==================== BOTÓN FLOTANTE VOLVER ARRIBA (FASE 4) ==================== -->
+  <button
+    type="button"
+    id="btnScrollTop"
+    aria-label="Volver arriba"
+    title="Volver a búsqueda y filtros"
+    class="fixed bottom-5 right-4 z-40 inline-flex items-center gap-1.5 px-3.5 py-2.5 min-h-[42px] rounded-full bg-slate-900/95 hover:bg-slate-800 text-cyan-200 border border-cyan-400/60 shadow-xl shadow-black/50 backdrop-blur-md text-xs font-extrabold cursor-pointer transition-all duration-200 opacity-0 translate-y-3 pointer-events-none active:scale-95"
+  >
+    <svg class="w-4 h-4 text-cyan-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="m18 15-6-6-6 6"/></svg>
+    <span>Arriba</span>
+  </button>
 
   <!-- ==================== TOAST FLOTANTE ==================== -->
   <div id="toastBox" class="pointer-events-none fixed bottom-5 left-1/2 -translate-x-1/2 z-50 opacity-0 translate-y-2 transition-all duration-200">
@@ -1090,7 +1144,8 @@
       otHistory: 'alm_ot_history_v1',
       reversoProgress: 'alm_reverso_progress_v1',
       extraSobrantes: 'alm_extra_sobrantes_v1',
-      feedbackEnabled: 'alm_feedback_enabled_v1'
+      feedbackEnabled: 'alm_feedback_enabled_v1',
+      revCompact: 'alm_rev_compact_v1'
     };
 
     const DAMAGE_REASONS = [
@@ -1885,6 +1940,9 @@ Reglas obligatorias:
       revFiltersOpen: true, // Panel plegable de filtros avanzados en Reverso
       revStatusFilters: [], // Vacío = Todos; permite combinar estados y desglose de incidencias
       revOnlyPending: false,
+      revCompact: false,    // Modo compacto visual en Reverso (Fase 4)
+      wakeLockDesired: false,
+      wakeLockSentinel: null,
       revCompletedOpen: false, // Acordeón inferior de productos completados (plegado por defecto)
       revCompletedManualOverride: null, // Respeta clic manual Mostrar/Ocultar hasta nuevo filtro o búsqueda
       highlightedOtKey: '',    // Resaltado temporal al saltar desde Incidencias ("Ver en OT →")
@@ -2279,10 +2337,14 @@ Reglas obligatorias:
       try {
         const fb = localStorage.getItem(STORAGE_KEYS.feedbackEnabled);
         if (fb !== null) state.feedbackEnabled = fb === 'true';
+        const cmp = localStorage.getItem(STORAGE_KEYS.revCompact);
+        if (cmp !== null) state.revCompact = cmp === 'true';
       } catch (e) {}
       upsertLocalHistoryFromActive();
       updateOtHeaderBadges();
       updateFeedbackButtonUI();
+      updateCompactRevUI();
+      updateWakeLockButtonUI();
       updateIncidentMetrics();
     }
 
@@ -2439,6 +2501,83 @@ Reglas obligatorias:
         btn.className = 'inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95';
         dot.className = 'w-2 h-2 rounded-full bg-slate-500';
       }
+    }
+
+    // Fase 4: Modo Compacto en Reverso
+    function updateCompactRevUI() {
+      const view = document.getElementById('viewReverso');
+      const btn = document.getElementById('btnToggleCompactRev');
+      const icon = document.getElementById('compactRevIcon');
+      const label = document.getElementById('compactRevLabel');
+      if (view) view.classList.toggle('rev-compact', Boolean(state.revCompact));
+      if (!btn || !icon || !label) return;
+      btn.setAttribute('aria-pressed', String(Boolean(state.revCompact)));
+      if (state.revCompact) {
+        icon.textContent = '▦';
+        label.textContent = 'Compacto ON';
+        btn.className = 'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border bg-cyan-500/20 text-cyan-200 border-cyan-400 shadow-sm shadow-cyan-500/15 transition cursor-pointer active:scale-95';
+      } else {
+        icon.textContent = '▤';
+        label.textContent = 'Compacto';
+        btn.className = 'inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-extrabold border bg-abyss text-slate-300 border-slate-700/90 hover:border-cyan-400/60 transition cursor-pointer active:scale-95';
+      }
+    }
+
+    // Fase 4: Pantalla fija (Screen Wake Lock API) con protección try/catch para iframe/Preview
+    function updateWakeLockButtonUI() {
+      const btn = document.getElementById('btnToggleWakeLock');
+      const icon = document.getElementById('wakeLockIcon');
+      const label = document.getElementById('wakeLockLabel');
+      if (!btn || !icon || !label) return;
+      const isLocked = Boolean(state.wakeLockSentinel);
+      btn.setAttribute('aria-pressed', String(isLocked));
+      if (isLocked) {
+        icon.textContent = '☀️';
+        label.textContent = 'Pantalla fija';
+        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-amber-500/20 text-amber-200 border-amber-400/70 shadow-sm shadow-amber-500/15 cursor-pointer transition active:scale-95';
+      } else {
+        icon.textContent = '🌙';
+        label.textContent = 'Pantalla auto';
+        btn.className = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border bg-slate-800/90 text-slate-300 border-slate-700 hover:border-cyan-400/60 hover:text-cyan-200 cursor-pointer transition active:scale-95';
+      }
+    }
+
+    async function requestScreenWakeLock(silent = false) {
+      if (!('wakeLock' in navigator)) {
+        state.wakeLockDesired = false;
+        updateWakeLockButtonUI();
+        if (!silent) showToast('Tu navegador no soporta bloqueo de pantalla');
+        return false;
+      }
+      try {
+        const sentinel = await navigator.wakeLock.request('screen');
+        state.wakeLockSentinel = sentinel;
+        sentinel.addEventListener('release', () => {
+          state.wakeLockSentinel = null;
+          updateWakeLockButtonUI();
+        });
+        updateWakeLockButtonUI();
+        return true;
+      } catch (err) {
+        state.wakeLockSentinel = null;
+        state.wakeLockDesired = false;
+        updateWakeLockButtonUI();
+        if (!silent) {
+          showToast('Pantalla fija restringida en vista previa (funciona en HTTPS móvil)');
+        }
+        return false;
+      }
+    }
+
+    async function releaseScreenWakeLock() {
+      state.wakeLockDesired = false;
+      if (state.wakeLockSentinel) {
+        try {
+          await state.wakeLockSentinel.release();
+        } catch (e) {}
+        state.wakeLockSentinel = null;
+      }
+      updateWakeLockButtonUI();
     }
 
     // Mantiene visible brevemente (1.3s) un producto recién completado antes de bajarlo
@@ -2708,6 +2847,7 @@ Reglas obligatorias:
       const btnClearRevQty = document.getElementById('btnClearRevQty');
       if (btnClearRevQty) btnClearRevQty.classList.toggle('hidden', !state.revQty);
       updateOnlyPendingUI();
+      updateCompactRevUI();
 
       // Estado del panel plegable de filtros avanzados y contador de filtros activos
       const advPanel = document.getElementById('revAdvFiltersPanel');
@@ -3160,7 +3300,7 @@ Reglas obligatorias:
                   data-rev-action="add-step"
                   data-step="-${quickStepCfg.undoStep}"
                   data-key="${safeKey}"
-                  class="px-2 py-1 min-h-[32px] rounded-lg bg-slate-800/90 hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 font-mono text-xs font-extrabold cursor-pointer transition active:scale-95"
+                  class="px-2.5 py-1 min-h-[32px] rounded-lg bg-slate-800/90 hover:bg-rose-500/20 text-slate-300 hover:text-rose-200 border border-slate-700 hover:border-rose-500/50 font-mono text-xs font-extrabold cursor-pointer transition active:scale-95"
                   title="Restar ${quickStepCfg.undoStep} unidades"
                 >−${quickStepCfg.undoStep}</button>
               ` : ''}
@@ -3174,7 +3314,7 @@ Reglas obligatorias:
             class="rounded-2xl border p-3.5 sm:p-4 space-y-3 transition ${cardStyle} ${isHighlighted ? 'rev-card-highlight' : ''}"
           >
             <!-- Cabecera: Posición, Zona, Código + Meta ERP y Estado -->
-            <div class="flex flex-wrap items-center justify-between gap-2">
+            <div class="flex flex-wrap items-center justify-between gap-1.5">
               <div class="flex items-center gap-1.5 flex-wrap">
                 <button
                   type="button"
@@ -3200,12 +3340,12 @@ Reglas obligatorias:
 
             <!-- Nombre y presentación -->
             <div class="space-y-0.5">
-              <h3 class="text-sm font-bold text-white leading-snug">${highlightMatches(it.nombre, state.revSearch)}</h3>
+              <h3 class="text-sm leading-snug font-bold text-white">${highlightMatches(it.nombre, state.revSearch)}</h3>
               <p class="font-mono text-[11px] text-amber-300/90">${highlightMatches(it.presentacion, state.revSearch)}</p>
             </div>
 
             <!-- Contador interactivo: + izquierda | cantidad editable | − derecha | ⚡ =Meta -->
-            <div class="grid grid-cols-12 gap-2 items-center">
+            <div class="grid grid-cols-12 gap-1.5 sm:gap-2 items-center">
               <button
                 type="button"
                 data-rev-action="inc"
@@ -3249,7 +3389,7 @@ Reglas obligatorias:
             ${summaryStrip}
 
             <!-- Barra inferior de acciones rápidas -->
-            <div class="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/75">
+            <div class="flex flex-wrap items-center justify-between gap-1.5 pt-1 border-t border-slate-800/75">
               <div class="flex flex-wrap items-center gap-1.5">
                 <button
                   type="button"
@@ -4797,6 +4937,22 @@ Reglas obligatorias:
         renderReversoView();
         showToast(state.revOnlyPending ? 'Mostrando solo productos pendientes' : 'Mostrando todos los productos');
       });
+      document.getElementById('btnToggleCompactRev').addEventListener('click', () => {
+        state.revCompact = !state.revCompact;
+        try { localStorage.setItem(STORAGE_KEYS.revCompact, String(state.revCompact)); } catch (e) {}
+        updateCompactRevUI();
+        showToast(state.revCompact ? 'Modo compacto activado' : 'Vista estándar restaurada');
+      });
+      document.getElementById('btnToggleWakeLock').addEventListener('click', async () => {
+        if (state.wakeLockDesired || state.wakeLockSentinel) {
+          await releaseScreenWakeLock();
+          showToast('Pantalla automática restaurada');
+        } else {
+          state.wakeLockDesired = true;
+          const ok = await requestScreenWakeLock(false);
+          if (ok) showToast('☀️ Pantalla fija activada para conteo');
+        }
+      });
       document.getElementById('btnResetRevFilters').addEventListener('click', () => {
         state.revSearch = '';
         state.revQty = '';
@@ -4820,25 +4976,24 @@ Reglas obligatorias:
       });
 
       // Reinicio de conteo en 2 toques (sin usar confirm())
-      let resetRevTimer = null;
-      const btnResetRev = document.getElementById('btnResetReverso');
-      btnResetRev.addEventListener('click', () => {
-        if (btnResetRev.dataset.armed !== 'true') {
-          btnResetRev.dataset.armed = 'true';
-          btnResetRev.innerHTML = '<span>¿Confirmar reinicio?</span>';
-          btnResetRev.classList.add('bg-rose-500/30', 'text-white', 'border-rose-400');
-          clearTimeout(resetRevTimer);
-          resetRevTimer = setTimeout(() => {
-            btnResetRev.dataset.armed = 'false';
-            btnResetRev.innerHTML = '<span>↺ Reiniciar</span>';
-            btnResetRev.classList.remove('bg-rose-500/30', 'text-white', 'border-rose-400');
+      document.getElementById('btnResetReverso').addEventListener('click', e => {
+        const btn = e.currentTarget;
+        if (btn.dataset.armed !== 'true') {
+          btn.dataset.armed = 'true';
+          btn.innerHTML = '<span>¿Confirmar reinicio?</span>';
+          btn.classList.add('bg-rose-500/30', 'text-white', 'border-rose-400');
+          setTimeout(() => {
+            if (btn.isConnected && btn.dataset.armed === 'true') {
+              btn.dataset.armed = 'false';
+              btn.innerHTML = '<span>↺ Reiniciar</span>';
+              btn.classList.remove('bg-rose-500/30', 'text-white', 'border-rose-400');
+            }
           }, 3500);
           return;
         }
-        clearTimeout(resetRevTimer);
-        btnResetRev.dataset.armed = 'false';
-        btnResetRev.innerHTML = '<span>↺ Reiniciar</span>';
-        btnResetRev.classList.remove('bg-rose-500/30', 'text-white', 'border-rose-400');
+        btn.dataset.armed = 'false';
+        btn.innerHTML = '<span>↺ Reiniciar</span>';
+        btn.classList.remove('bg-rose-500/30', 'text-white', 'border-rose-400');
         state.reversoProgress = {};
         state.reversoDamageOpen = {};
         clearAllGraceTimers();
@@ -4846,24 +5001,22 @@ Reglas obligatorias:
         state.revCompletedManualOverride = null;
         persistActiveOtLocally();
         scheduleCloudSyncOt(true);
+        updateIncidentMetrics();
         renderReversoView();
-        showToast(`Conteo de OT ${state.ot.ot} reiniciado a 0`);
+        showToast('Conteo de esta OT reiniciado a cero');
       });
 
-      // Toggle del acordeón inferior de Productos completados (respeta override manual)
-      const btnToggleCompleted = document.getElementById('btnToggleCompletedSection');
-      if (btnToggleCompleted) {
-        btnToggleCompleted.addEventListener('click', () => {
-          const bodyEl = document.getElementById('reversoCompletedBody');
-          const currentlyOpen = bodyEl ? !bodyEl.classList.contains('hidden') : Boolean(state.revCompletedOpen);
-          const nextOpen = !currentlyOpen;
-          state.revCompletedOpen = nextOpen;
-          state.revCompletedManualOverride = nextOpen;
-          renderReversoView();
-        });
-      }
+      // Acordeón inferior: Mostrar / Ocultar Productos completados (Fase 1 + Fase 2)
+      document.getElementById('btnToggleCompletedSection').addEventListener('click', () => {
+        const body = document.getElementById('reversoCompletedBody');
+        const currentlyOpen = body ? !body.classList.contains('hidden') : state.revCompletedOpen;
+        const nextOpen = !currentlyOpen;
+        state.revCompletedOpen = nextOpen;
+        state.revCompletedManualOverride = nextOpen;
+        renderReversoView();
+      });
 
-      // Delegación compartida de eventos en tarjetas de Reverso (pendientes + completados)
+      // Delegación compartida para tarjetas de pendientes (arriba) y completados (abajo)
       const handleReversoCardClick = e => {
         const copyBtn = e.target.closest('[data-rev-copy]');
         if (copyBtn) {
@@ -5228,6 +5381,25 @@ Reglas obligatorias:
       });
       document.getElementById('btnSaveExtraNew').addEventListener('click', submitExtraNewProduct);
 
+      // Botón flotante discreto "↑ Arriba" (Fase 4)
+      const btnScrollTop = document.getElementById('btnScrollTop');
+      if (btnScrollTop) {
+        const updateScrollTopBtn = () => {
+          const visible = window.scrollY > 320;
+          btnScrollTop.classList.toggle('opacity-0', !visible);
+          btnScrollTop.classList.toggle('translate-y-3', !visible);
+          btnScrollTop.classList.toggle('pointer-events-none', !visible);
+          btnScrollTop.classList.toggle('opacity-100', visible);
+          btnScrollTop.classList.toggle('translate-y-0', visible);
+          btnScrollTop.classList.toggle('pointer-events-auto', visible);
+        };
+        window.addEventListener('scroll', updateScrollTopBtn, { passive: true });
+        btnScrollTop.addEventListener('click', () => {
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+        updateScrollTopBtn();
+      }
+
       // Red y atajos
       window.addEventListener('online', () => {
         if (state.cloud.ready) {
@@ -5245,6 +5417,8 @@ Reglas obligatorias:
       document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'hidden' && state.cloud.pendingSync) {
           flushCloudOtSync();
+        } else if (document.visibilityState === 'visible' && state.wakeLockDesired && !state.wakeLockSentinel) {
+          requestScreenWakeLock(true);
         }
       });
       document.addEventListener('keydown', e => {
