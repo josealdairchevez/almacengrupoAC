@@ -4,162 +4,133 @@
  * Service Worker PWA - Gestión de Almacén & Reverso AC
  * ----------------------------------------------------
  * - Pre-cachea el shell local y librerías CDN para abrir sin señal en piso.
- * - Usa Network-First en index.html para recibir actualizaciones de GitHub Pages.
- * - Excluye peticiones de Firestore/Firebase Auth para no interferir con la
- *   persistencia offline nativa ni el tiempo real de Firebase.
+ * - index.html: red primero (para recibir actualizaciones de GitHub Pages). Si la
+ *   red falla o tarda más de NAV_TIMEOUT_MS, abre la copia guardada.
+ * - Solo guarda archivos propios y las librerías de la lista. Firestore, Auth y
+ *   las pruebas de red del SDK pasan directo a la red.
+ * - Sube CACHE_VERSION cuando cambies la lista de archivos o este archivo.
  */
 
-const CACHE_VERSION = 'almacen-ac-v1';
+const CACHE_PREFIX = 'almacen-ac-';           // solo se borran cachés con este prefijo
+const CACHE_VERSION = CACHE_PREFIX + 'v2';
+const NAV_TIMEOUT_MS = 3000;
 
-// Archivos propios del repositorio (GitHub Pages)
-const LOCAL_ASSETS = [
-  './',
-  './index.html',
-  './manifest.json',
-  './icon.svg'
-];
+const APP_PAGE = './index.html';
+const APP_PATHS = ['./', APP_PAGE].map((path) => new URL(path, self.location).pathname);
 
-// Librerías externas necesarias para que la app abra con estilos y motor offline
-const EXTERNAL_ASSETS = [
+// Sin estos la app NO abre sin señal: si uno falla, la instalación se cancela
+// y se conserva la versión anterior completa.
+const REQUIRED_ASSETS = [
+  APP_PAGE,
   'https://cdn.tailwindcss.com',
   'https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js',
   'https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js',
   'https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js'
 ];
 
-// Dominios de API en tiempo real que NO deben ser cacheados por el Service Worker
-const BYPASS_HOSTS = [
-  'firestore.googleapis.com',
-  'identitytoolkit.googleapis.com',
-  'securetoken.googleapis.com',
-  'firebaseinstallations.googleapis.com',
-  'www.google-analytics.com',
-  'analytics.google.com'
+// Deseables: si fallan, la app igual funciona
+const OPTIONAL_ASSETS = [
+  './manifest.json',
+  './icon.svg',
+  'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700;800&display=swap'
 ];
 
-// 1. INSTALACIÓN: Guarda recursos base de forma tolerante a fallos individuales
+// Únicos dominios externos que se guardan en caché
+const CACHEABLE_HOSTS = ['cdn.tailwindcss.com', 'www.gstatic.com', 'fonts.googleapis.com', 'fonts.gstatic.com'];
+
+async function precache(cache, url) {
+  const isLocal = url.startsWith('./');
+  let response;
+  try {
+    response = await fetch(url, isLocal ? { cache: 'reload' } : { mode: 'cors' });
+  } catch (err) {
+    if (isLocal) throw err;
+    response = await fetch(url, { mode: 'no-cors' }); // CDN sin CORS: respuesta opaca
+  }
+  if (!response.ok && response.type !== 'opaque') {
+    throw new Error(`[SW] ${response.status} al pre-cachear ${url}`);
+  }
+  await cache.put(url, response);
+}
+
+// 1. INSTALACIÓN
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_VERSION).then(async (cache) => {
-      // Cachear archivos locales uno por uno para evitar abortar por un recurso opcional
-      await Promise.allSettled(
-        LOCAL_ASSETS.map(async (url) => {
-          try {
-            const response = await fetch(url, { cache: 'reload' });
-            if (response && response.ok) {
-              await cache.put(url, response);
-            }
-          } catch (err) {
-            console.warn('[SW] No se pudo pre-cachear local:', url);
-          }
-        })
-      );
-
-      // Cachear CDN externos (acepta respuestas opacas no-cors si es necesario)
-      await Promise.allSettled(
-        EXTERNAL_ASSETS.map(async (url) => {
-          try {
-            const req = new Request(url, { mode: 'cors' });
-            const res = await fetch(req);
-            if (res && (res.ok || res.type === 'opaque')) {
-              await cache.put(url, res);
-            }
-          } catch (_) {
-            try {
-              const opaqueRes = await fetch(new Request(url, { mode: 'no-cors' }));
-              if (opaqueRes) {
-                await cache.put(url, opaqueRes);
-              }
-            } catch (err2) {
-              console.warn('[SW] No se pudo pre-cachear CDN:', url);
-            }
-          }
-        })
-      );
-    }).then(() => self.skipWaiting())
-  );
+  event.waitUntil((async () => {
+    const cache = await caches.open(CACHE_VERSION);
+    await Promise.all(REQUIRED_ASSETS.map((url) => precache(cache, url)));
+    await Promise.allSettled(OPTIONAL_ASSETS.map((url) => precache(cache, url)));
+    await self.skipWaiting();
+  })());
 });
 
-// 2. ACTIVACIÓN: Elimina cachés de versiones anteriores y toma el control inmediato
+// 2. ACTIVACIÓN: borra solo las versiones anteriores de ESTA app
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_VERSION)
-          .map((oldKey) => caches.delete(oldKey))
-      )
-    ).then(() => self.clients.claim())
-  );
+  event.waitUntil((async () => {
+    const keys = await caches.keys();
+    await Promise.all(
+      keys
+        .filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_VERSION)
+        .map((key) => caches.delete(key))
+    );
+    await self.clients.claim();
+  })());
 });
+
+// Página de la app: red primero, con límite de espera
+function appPage(event) {
+  const network = fetch(event.request);
+  const update = network.then(async (response) => {
+    if (!response.ok) return;
+    const copy = response.clone();
+    const cache = await caches.open(CACHE_VERSION);
+    await cache.put(APP_PAGE, copy);
+  });
+  event.waitUntil(update.catch(() => {}));
+
+  return caches.match(APP_PAGE, { cacheName: CACHE_VERSION }).then((cached) => {
+    if (!cached) return network;
+    return Promise.race([
+      network.then(
+        (response) => (response.ok || response.type === 'opaqueredirect' ? response : cached),
+        () => cached
+      ),
+      new Promise((resolve) => setTimeout(resolve, NAV_TIMEOUT_MS, cached))
+    ]);
+  });
+}
 
 // 3. INTERCEPTOR DE RED (FETCH)
 self.addEventListener('fetch', (event) => {
   const { request } = event;
-
-  // Solo manejamos peticiones GET HTTP/HTTPS
   if (request.method !== 'GET') return;
 
-  let url;
-  try {
-    url = new URL(request.url);
-  } catch (_) {
+  const url = new URL(request.url);
+  const sameOrigin = url.origin === self.location.origin;
+
+  // Estrategia A: solo la página principal. Otras navegaciones van directo a la red.
+  if (request.mode === 'navigate') {
+    if (sameOrigin && APP_PATHS.includes(url.pathname)) event.respondWith(appPage(event));
     return;
   }
 
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+  // Estrategia B: copia guardada primero y actualización por detrás
+  const cacheable = sameOrigin || (
+    CACHEABLE_HOSTS.includes(url.hostname) &&
+    (url.hostname !== 'www.gstatic.com' || url.pathname.startsWith('/firebasejs/'))
+  );
+  if (!cacheable) return;
 
-  // Dejar pasar libremente el tráfico en vivo de Firebase / Firestore
-  if (BYPASS_HOSTS.some((host) => url.hostname.includes(host))) {
-    return;
-  }
-
-  const isNavigation =
-    request.mode === 'navigate' ||
-    url.pathname.endsWith('/') ||
-    url.pathname.endsWith('/index.html');
-
-  // Estrategia A: Network-First para la página principal (siempre actualizada si hay red)
-  if (isNavigation) {
-    event.respondWith(
-      fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && networkResponse.ok) {
-            const copy = networkResponse.clone();
-            caches.open(CACHE_VERSION).then((cache) => {
-              cache.put(request, copy.clone());
-              cache.put('./index.html', copy);
-            });
-          }
-          return networkResponse;
-        })
-        .catch(async () => {
-          const cache = await caches.open(CACHE_VERSION);
-          return (
-            (await cache.match(request)) ||
-            (await cache.match('./index.html')) ||
-            (await cache.match('./'))
-          );
-        })
-    );
-    return;
-  }
-
-  // Estrategia B: Stale-While-Revalidate para scripts, estilos, fuentes e íconos
+  const network = fetch(request);
+  const update = network.then(async (response) => {
+    const copy = response.clone();
+    const cache = await caches.open(CACHE_VERSION);
+    // Una respuesta opaca puede ser un error: nunca reemplaza una copia que ya existe
+    if (copy.ok || (copy.type === 'opaque' && !(await cache.match(request)))) {
+      await cache.put(request, copy);
+    }
+  });
+  event.waitUntil(update.catch(() => {}));
   event.respondWith(
-    caches.open(CACHE_VERSION).then(async (cache) => {
-      const cachedResponse = await cache.match(request);
-
-      const networkFetch = fetch(request)
-        .then((networkResponse) => {
-          if (networkResponse && (networkResponse.ok || networkResponse.type === 'opaque')) {
-            cache.put(request, networkResponse.clone());
-          }
-          return networkResponse;
-        })
-        .catch(() => null);
-
-      return cachedResponse || networkFetch;
-    })
+    caches.match(request, { cacheName: CACHE_VERSION }).then((cached) => cached || network)
   );
 });
